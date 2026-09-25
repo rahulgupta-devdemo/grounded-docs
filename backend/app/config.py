@@ -15,11 +15,18 @@ class Settings(BaseSettings):
     embedding_model: str = "gemini-embedding-2"
     embedding_dim: int = 768
     embed_batch_size: int = 20
+    # Tried in order; the next one answers if a model is overloaded.
+    chat_models: str = "gemini-3.5-flash-lite,gemini-3.1-flash-lite"
 
     chunk_size: int = 3000
     chunk_overlap: int = 400
+    top_k: int = 5
 
     qdrant_url: str = "http://localhost:6333"
+
+    @property
+    def chat_model_list(self) -> list[str]:
+        return [m.strip() for m in self.chat_models.split(",") if m.strip()]
 
 
 @lru_cache

@@ -6,7 +6,7 @@ from google.genai import errors as genai_errors
 from qdrant_client.http.exceptions import ResponseHandlingException
 
 from app import vector_store
-from app.api import documents
+from app.api import chat, documents
 from app.config import get_settings
 
 
@@ -18,6 +18,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(title="Document Chat API", lifespan=lifespan)
 app.include_router(documents.router)
+app.include_router(chat.router)
 
 
 @app.exception_handler(genai_errors.APIError)

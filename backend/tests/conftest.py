@@ -1,3 +1,7 @@
+import math
+import re
+import zlib
+
 import pymupdf
 import pytest
 from qdrant_client import QdrantClient
@@ -21,18 +25,47 @@ def memory_qdrant(monkeypatch):
     return client
 
 
+def lexical_vector(text: str) -> list[float]:
+    """Deterministic stand-in for an embedding: texts sharing words get similar vectors."""
+    dim = get_settings().embedding_dim
+    vector = [0.0] * dim
+    for word in re.findall(r"\w+", text.lower()):
+        vector[zlib.crc32(word.encode()) % dim] += 1.0
+    norm = math.sqrt(sum(v * v for v in vector)) or 1.0
+    return [v / norm for v in vector]
+
+
 @pytest.fixture
 def fake_embeddings(monkeypatch):
-    """Replace the Gemini call; records how many texts were embedded."""
+    """Replace the Gemini embedding calls; records how many texts were embedded."""
     calls: list[int] = []
 
     def fake_embed_documents(items):
         calls.append(len(items))
-        dim = get_settings().embedding_dim
-        return [[1.0 + i] + [0.5] * (dim - 1) for i in range(len(items))]
+        return [lexical_vector(text) for _, text in items]
 
     monkeypatch.setattr(llm, "embed_documents", fake_embed_documents)
+    monkeypatch.setattr(llm, "embed_query", lexical_vector)
     return calls
+
+
+class FakeGenerator:
+    def __init__(self):
+        self.answer = "IP66 [1]"
+        self.prompts: list[str] = []
+
+    def __call__(self, system_instruction, prompt):
+        self.prompts.append(prompt)
+        return llm.Generation(
+            text=self.answer, model="gemini-3.5-flash-lite", input_tokens=1000, output_tokens=100
+        )
+
+
+@pytest.fixture
+def fake_generate(monkeypatch):
+    generator = FakeGenerator()
+    monkeypatch.setattr(llm, "generate", generator)
+    return generator
 
 
 def _make_pdf(pages: list[list[str]]) -> bytes:

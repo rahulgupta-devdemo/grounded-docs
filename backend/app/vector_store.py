@@ -1,6 +1,7 @@
 """All Qdrant access goes through this module."""
 
 import uuid
+from dataclasses import dataclass
 from functools import lru_cache
 
 from qdrant_client import QdrantClient, models
@@ -8,6 +9,15 @@ from qdrant_client import QdrantClient, models
 from app.chunking import Chunk
 from app.config import get_settings
 from app.schemas import DocumentInfo
+
+
+@dataclass(frozen=True)
+class SearchHit:
+    document_id: str
+    filename: str
+    page: int
+    text: str
+    score: float  # cosine similarity, higher is more similar
 
 
 @lru_cache
@@ -88,6 +98,33 @@ def list_documents() -> list[DocumentInfo]:
         for p in points
     ]
     return sorted(documents, key=lambda d: d.filename.lower())
+
+
+def search(vector: list[float], limit: int, document_ids: list[str] | None = None) -> list[SearchHit]:
+    client = get_client()
+    name = collection_name()
+    if not client.collection_exists(name):
+        return []
+
+    query_filter = None
+    if document_ids is not None:
+        query_filter = models.Filter(
+            must=[models.FieldCondition(key="document_id", match=models.MatchAny(any=document_ids))]
+        )
+
+    points = client.query_points(
+        name, query=vector, limit=limit, query_filter=query_filter, with_payload=True
+    ).points
+    return [
+        SearchHit(
+            document_id=p.payload["document_id"],
+            filename=p.payload["filename"],
+            page=p.payload["page"],
+            text=p.payload["text"],
+            score=p.score,
+        )
+        for p in points
+    ]
 
 
 def _ensure_collection(client: QdrantClient, name: str) -> None:

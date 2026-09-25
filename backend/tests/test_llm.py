@@ -1,6 +1,7 @@
 from types import SimpleNamespace
 
 import pytest
+from google.genai import errors as genai_errors
 from google.genai import types
 
 from app import llm
@@ -51,6 +52,74 @@ def test_query_uses_question_answering_prefix(fake_models):
     assert fake_models.requests[0][0].parts[0].text == (
         "task: question answering | query: Which IP rating?"
     )
+
+
+class FakeGenerateModels:
+    """Fails with the given errors per model, otherwise answers."""
+
+    def __init__(self, failures: dict[str, Exception]):
+        self.failures = failures
+        self.called: list[str] = []
+
+    def generate_content(self, *, model, contents, config):
+        self.called.append(model)
+        if model in self.failures:
+            raise self.failures[model]
+        return types.GenerateContentResponse(
+            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text="Answer [1]")]))],
+            usage_metadata=types.GenerateContentResponseUsageMetadata(
+                prompt_token_count=500, candidates_token_count=20, thoughts_token_count=30
+            ),
+        )
+
+
+def _use_generate_models(monkeypatch, models):
+    monkeypatch.setenv("CHAT_MODELS", "primary-model,fallback-model")
+    llm.get_settings.cache_clear()
+    monkeypatch.setattr(llm, "_client", lambda: SimpleNamespace(models=models))
+
+
+def _server_error(code):
+    return genai_errors.ServerError(code, {"error": {"message": "busy", "status": "UNAVAILABLE"}})
+
+
+def test_generate_reports_model_and_counts_thinking_as_output(monkeypatch):
+    _use_generate_models(monkeypatch, FakeGenerateModels({}))
+
+    generation = llm.generate("system", "prompt")
+
+    assert generation.text == "Answer [1]"
+    assert generation.model == "primary-model"
+    assert generation.input_tokens == 500
+    assert generation.output_tokens == 50
+
+
+def test_overloaded_model_falls_back_to_next(monkeypatch):
+    models = FakeGenerateModels({"primary-model": _server_error(503)})
+    _use_generate_models(monkeypatch, models)
+
+    generation = llm.generate("system", "prompt")
+
+    assert models.called == ["primary-model", "fallback-model"]
+    assert generation.model == "fallback-model"
+
+
+def test_request_errors_do_not_fall_back(monkeypatch):
+    bad_request = genai_errors.ClientError(400, {"error": {"message": "bad", "status": "INVALID_ARGUMENT"}})
+    models = FakeGenerateModels({"primary-model": bad_request})
+    _use_generate_models(monkeypatch, models)
+
+    with pytest.raises(genai_errors.ClientError):
+        llm.generate("system", "prompt")
+    assert models.called == ["primary-model"]
+
+
+def test_raises_when_all_models_are_unavailable(monkeypatch):
+    models = FakeGenerateModels({"primary-model": _server_error(503), "fallback-model": _server_error(504)})
+    _use_generate_models(monkeypatch, models)
+
+    with pytest.raises(genai_errors.ServerError):
+        llm.generate("system", "prompt")
 
 
 def test_fails_loudly_if_provider_returns_fewer_vectors(monkeypatch):

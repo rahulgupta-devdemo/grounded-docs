@@ -53,6 +53,8 @@ The guiding rule: a small system that works end to end and where every step can 
 **Rejected:** OpenAI (comparable quality and price; no advantage for this task and requires prepaid credit). Anthropic (no embedding API, so a second provider would be needed). A local model via Ollama (no API cost, but a multi-gigabyte install on the reviewer's machine and slower answers).
 **Trade-off:** Dependence on an external API and its rate limits. Switching provider means implementing `embed()` and `generate()` for the new SDK and re-embedding the documents.
 
+**Answer model, chosen by measurement:** the plan was the newest stable Flash model (`gemini-3.8-flash`). Tested on the free tier on 2026-09-25, it returned `503 model overloaded` on every call, and `gemini-3.5-flash` timed out after 60 seconds. `gemini-3.5-flash-lite` answered every call in under one second, at 60% lower cost. The app therefore uses `gemini-3.5-flash-lite`, with `gemini-3.1-flash-lite` as automatic fallback: if a model returns 429, 500, 503 or 504, the next model in `CHAT_MODELS` answers. Other errors (for example an invalid request) are not retried on another model, because a second model would fail the same way. On a paid tier or with reserved capacity, the stronger model becomes a configuration change.
+
 ## 6. Embeddings: `gemini-embedding-2`, 768 dimensions
 
 **Decision:** `gemini-embedding-2` with an output size of 768.
@@ -65,6 +67,8 @@ The guiding rule: a small system that works end to end and where every step can 
 - Passing a list of texts to this model returns **one combined vector**, not one per text. Each chunk is therefore sent as its own `Content` object, and a test checks that the number of vectors equals the number of chunks. Without this, retrieval would fail silently.
 - The model takes the task as a text prefix instead of a parameter: questions are embedded as `task: question answering | query: …`, chunks as `title: <file name> | text: …`.
 - Vectors from different embedding models cannot be compared. The Qdrant collection name contains the model name and dimension, so changing the model can never mix old and new vectors.
+
+**Verified against the live API:** a batch of 20 chunks returns 20 distinct 768-dimensional vectors of length 1.0. A German question ("Welche Schutzart hat die Leuchte?") scored 0.77 against an English passage about IP66 and 0.69 against an English passage about luminous flux, so cross-language retrieval ranks the right passage higher.
 
 **Rejected:** `gemini-embedding-001`. Batching is simpler, but it is the older model, limited to 2,048 input tokens and text only. It remains the fallback if rate limits for the newer model are too tight.
 **Trade-off:** Per-chunk wrapping is slightly more code than a plain list.
@@ -96,6 +100,7 @@ The guiding rule: a small system that works end to end and where every step can 
 **Why:** It is the simplest retrieval that works, and it gives a clear baseline to measure improvements against.
 **Rejected for now:** Hybrid search (keyword plus vector) and reranking. Both are the most likely next improvements, especially for exact product codes and part numbers, but they should be added when the evaluation shows where the baseline fails, not before.
 **Trade-off:** Pure vector search can miss exact identifiers such as article numbers.
+**Observed:** in a first end-to-end test, the question about the protection class ranked a datasheet's title page (which repeats the product name) above the technical-data page that holds the answer. The answer was still correct because both were in the top 5, but it shows why the evaluation measures the rank of the right page, not just whether it was found.
 
 ## 11. Why retrieval at all, when models accept very long inputs
 
@@ -114,6 +119,12 @@ Current models accept around one million tokens, so the whole document could be 
 **Rejected:** Letting the model add general knowledge. It makes answers look better and makes them impossible to verify.
 **Trade-off:** Some answers will be "not found" where a general model would have produced something.
 
+**Answer language, fixed after testing:** with the rule "answer in the language of the question" only in the instructions, English questions about a German manual were answered in German in 4 of 9 runs; the model follows the language of the passage, especially when the answer is close to a quote. The code now detects whether the question is German or English (a word list plus umlauts, no extra dependency) and states the language explicitly ("Answer in English"). Result: 9 of 9 correct. Other languages fall back to the general rule; supporting more languages would need a language-identification library.
+
+**Prompt injection:** document text is placed in numbered passages and the instructions say to ignore any instructions inside them. An uploaded document is data, not a command.
+
+**No documents selected:** the model is not called at all, so there is no cost and no chance of an answer without sources.
+
 ## 13. API
 
 **Decision:** Three endpoints: `POST /documents` (upload and index), `GET /documents` (list), `POST /chat` (question in, answer with sources and cost out).
@@ -122,9 +133,9 @@ Current models accept around one million tokens, so the whole document could be 
 
 ## 14. Cost shown per answer
 
-**Decision:** Each answer reports its token usage and an estimated cost, using per-token prices from configuration.
-**Why:** Whether a tool like this is worth running at scale is a cost question. Showing the figure on every answer makes it concrete instead of assumed.
-**Trade-off:** Prices in configuration must be kept current.
+**Decision:** Each answer reports the model used, its token usage and the cost, from a price table in `pricing.py` that records its source and the date it was checked. Thinking tokens are counted as output, because they are billed as output.
+**Why:** Whether a tool like this is worth running at scale is a cost question. Showing the figure on every answer makes it concrete instead of assumed. Measured in the first end-to-end test: about $0.0002–0.0003 per question with short documents; with full-size chunks about $0.002.
+**Trade-off:** The price table must be kept current (the `gemini-3.8-flash` price doubles on 2027-01-01). Unknown models report no cost rather than a wrong one.
 
 ## 15. Packaging: Docker Compose
 

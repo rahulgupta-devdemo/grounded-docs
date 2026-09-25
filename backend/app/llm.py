@@ -4,9 +4,12 @@ Switching provider means reimplementing these functions; nothing else in
 the backend imports the Gemini SDK.
 """
 
+from dataclasses import dataclass
 from functools import lru_cache
 
+import httpx
 from google import genai
+from google.genai import errors as genai_errors
 from google.genai import types
 
 from app.config import get_settings
@@ -17,6 +20,22 @@ _RETRY = types.HttpRetryOptions(
     max_delay=30.0,
     http_status_codes=[429, 500, 503],
 )
+
+# Answers are interactive: retry briefly, then move on to the next model
+# instead of making the user wait through long backoffs.
+_GENERATION_HTTP = types.HttpOptions(
+    retry_options=types.HttpRetryOptions(attempts=2, initial_delay=1.0, http_status_codes=[429, 503]),
+    timeout=20_000,
+)
+_FALLBACK_STATUS = {429, 500, 503, 504}
+
+
+@dataclass(frozen=True)
+class Generation:
+    text: str
+    model: str
+    input_tokens: int
+    output_tokens: int  # includes thinking tokens, which are billed as output
 
 
 @lru_cache
@@ -39,6 +58,45 @@ def embed_documents(items: list[tuple[str, str]]) -> list[list[float]]:
 
 def embed_query(question: str) -> list[float]:
     return _embed([f"task: question answering | query: {question}"])[0]
+
+
+def generate(system_instruction: str, prompt: str) -> Generation:
+    """Answer with the first configured model that is available."""
+    last_error: Exception | None = None
+    for model in get_settings().chat_model_list:
+        try:
+            response = _client().models.generate_content(
+                model=model,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    system_instruction=system_instruction,
+                    http_options=_GENERATION_HTTP,
+                    automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
+                ),
+            )
+        except genai_errors.APIError as exc:
+            if exc.code not in _FALLBACK_STATUS:
+                raise
+            last_error = exc
+            continue
+        except httpx.TimeoutException as exc:
+            last_error = exc
+            continue
+
+        usage = response.usage_metadata
+        return Generation(
+            text=(response.text or "").strip(),
+            model=model,
+            input_tokens=(usage.prompt_token_count or 0) if usage else 0,
+            output_tokens=(
+                (usage.candidates_token_count or 0) + (usage.thoughts_token_count or 0)
+                if usage
+                else 0
+            ),
+        )
+
+    assert last_error is not None, "CHAT_MODELS is empty"
+    raise last_error
 
 
 def _embed(texts: list[str]) -> list[list[float]]:
