@@ -11,6 +11,14 @@ _ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=_ENV_FILE, extra="ignore")
 
+    gemini_api_key: str
+    embedding_model: str = "gemini-embedding-2"
+    embedding_dim: int = 768
+    embed_batch_size: int = 20
+
+    chunk_size: int = 3000
+    chunk_overlap: int = 400
+
     qdrant_url: str = "http://localhost:6333"
 
 

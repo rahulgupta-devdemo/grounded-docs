@@ -6,6 +6,10 @@ import pymupdf
 _TEXT_BLOCK = 0
 
 
+class InvalidPdfError(ValueError):
+    pass
+
+
 @dataclass(frozen=True)
 class Page:
     number: int  # 1-based position in the file, as shown by PDF viewers
@@ -14,7 +18,14 @@ class Page:
 
 def extract_pages(pdf_bytes: bytes) -> list[Page]:
     """Return the text of every page; paragraphs are separated by a blank line."""
-    with pymupdf.open(stream=pdf_bytes, filetype="pdf") as doc:
+    try:
+        doc = pymupdf.open(stream=pdf_bytes, filetype="pdf")
+    except pymupdf.FileDataError as exc:
+        raise InvalidPdfError("The file could not be read as a PDF.") from exc
+
+    with doc:
+        if doc.needs_pass:
+            raise InvalidPdfError("The PDF is password-protected.")
         return [Page(number=i + 1, text=_page_text(page)) for i, page in enumerate(doc)]
 
 
