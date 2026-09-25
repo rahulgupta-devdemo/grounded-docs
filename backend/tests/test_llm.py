@@ -104,6 +104,13 @@ def test_overloaded_model_falls_back_to_next(monkeypatch):
     assert generation.model == "fallback-model"
 
 
+def test_deadline_exceeded_falls_back_to_next(monkeypatch):
+    models = FakeGenerateModels({"primary-model": _server_error(504)})
+    _use_generate_models(monkeypatch, models)
+
+    assert llm.generate("system", "prompt").model == "fallback-model"
+
+
 def test_request_errors_do_not_fall_back(monkeypatch):
     bad_request = genai_errors.ClientError(400, {"error": {"message": "bad", "status": "INVALID_ARGUMENT"}})
     models = FakeGenerateModels({"primary-model": bad_request})

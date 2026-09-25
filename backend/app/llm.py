@@ -21,12 +21,7 @@ _RETRY = types.HttpRetryOptions(
     http_status_codes=[429, 500, 503],
 )
 
-# Answers are interactive: retry briefly, then move on to the next model
-# instead of making the user wait through long backoffs.
-_GENERATION_HTTP = types.HttpOptions(
-    retry_options=types.HttpRetryOptions(attempts=2, initial_delay=1.0, http_status_codes=[429, 503]),
-    timeout=20_000,
-)
+# 504 is what the API returns when the request deadline passes.
 _FALLBACK_STATUS = {429, 500, 503, 504}
 
 
@@ -61,16 +56,23 @@ def embed_query(question: str) -> list[float]:
 
 
 def generate(system_instruction: str, prompt: str) -> Generation:
-    """Answer with the first configured model that is available."""
+    """Answer with the first configured model that responds in time."""
+    settings = get_settings()
+    # Answers are interactive: one attempt per model with a short deadline,
+    # then the next model, instead of waiting through retries and backoff.
+    http_options = types.HttpOptions(
+        retry_options=types.HttpRetryOptions(attempts=1),
+        timeout=settings.chat_timeout_seconds * 1000,
+    )
     last_error: Exception | None = None
-    for model in get_settings().chat_model_list:
+    for model in settings.chat_model_list:
         try:
             response = _client().models.generate_content(
                 model=model,
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     system_instruction=system_instruction,
-                    http_options=_GENERATION_HTTP,
+                    http_options=http_options,
                     automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
                 ),
             )

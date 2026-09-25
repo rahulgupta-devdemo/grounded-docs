@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 
+import httpx
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from google.genai import errors as genai_errors
@@ -25,6 +26,14 @@ app.include_router(chat.router)
 def model_provider_error(_: Request, exc: genai_errors.APIError) -> JSONResponse:
     return JSONResponse(
         status_code=502, content={"detail": f"The model provider returned an error: {exc.message}"}
+    )
+
+
+@app.exception_handler(httpx.TimeoutException)
+def model_provider_timeout(_: Request, __: httpx.TimeoutException) -> JSONResponse:
+    return JSONResponse(
+        status_code=504,
+        content={"detail": "The language model did not respond in time. Please try again."},
     )
 
 

@@ -1,6 +1,8 @@
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 
+from app import llm
 from app.answering import NO_DOCUMENTS_ANSWER, cited_numbers
 from app.main import app
 
@@ -87,6 +89,17 @@ def test_empty_document_selection_is_not_a_search_of_everything(client, two_docu
 
     assert body["answer"] == NO_DOCUMENTS_ANSWER
     assert fake_generate.prompts == []
+
+
+def test_timeout_of_all_models_returns_504_with_reason(client, two_documents, monkeypatch):
+    def timing_out(_system, _prompt):
+        raise httpx.ReadTimeout("The read operation timed out")
+
+    monkeypatch.setattr(llm, "generate", timing_out)
+    response = _ask(client, "IP66?")
+
+    assert response.status_code == 504
+    assert "did not respond in time" in response.json()["detail"]
 
 
 def test_empty_question_is_rejected(client):

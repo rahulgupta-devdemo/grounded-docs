@@ -1,6 +1,8 @@
 // Same citation format the backend parses: [1], [2][3], [1, 4].
 const CITATION = /(\[\d+(?:\s*,\s*\d+)*\])/;
 const BOLD = /(\*\*[^*]+\*\*)/;
+// "* item" or "- item" at the start of a line; "**bold**" is not matched.
+const BULLET = /^(\s*)[*-]\s+/gm;
 
 type Props = {
   text: string;
@@ -10,7 +12,7 @@ type Props = {
 export default function AnswerText({ text, onCite }: Props) {
   return (
     <p className="text-[15px] leading-relaxed whitespace-pre-wrap">
-      {text.split(CITATION).map((part, i) =>
+      {text.replace(BULLET, "$1• ").split(CITATION).map((part, i) =>
         CITATION.test(part) ? (
           part
             .slice(1, -1)

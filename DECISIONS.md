@@ -53,7 +53,16 @@ The guiding rule: a small system that works end to end and where every step can 
 **Rejected:** OpenAI (comparable quality and price; no advantage for this task and requires prepaid credit). Anthropic (no embedding API, so a second provider would be needed). A local model via Ollama (no API cost, but a multi-gigabyte install on the reviewer's machine and slower answers).
 **Trade-off:** Dependence on an external API and its rate limits. Switching provider means implementing `embed()` and `generate()` for the new SDK and re-embedding the documents.
 
-**Answer model, chosen by measurement:** the plan was the newest stable Flash model (`gemini-3.8-flash`). Tested on the free tier on 2026-09-25, it returned `503 model overloaded` on every call, and `gemini-3.5-flash` timed out after 60 seconds. `gemini-3.5-flash-lite` answered every call in under one second, at 60% lower cost. The app therefore uses `gemini-3.5-flash-lite`, with `gemini-3.1-flash-lite` as automatic fallback: if a model returns 429, 500, 503 or 504, the next model in `CHAT_MODELS` answers. Other errors (for example an invalid request) are not retried on another model, because a second model would fail the same way. On a paid tier or with reserved capacity, the stronger model becomes a configuration change.
+**Answer model, chosen by measurement:** the plan was the newest stable Flash model (`gemini-3.8-flash`). Tested on the free tier on 2026-09-25, it returned `503 model overloaded` on every call, and `gemini-3.5-flash` timed out after 60 seconds. The two Flash-Lite models were the only ones that answered reliably, but their speed changed during the day:
+
+| Model | Morning | Afternoon |
+|---|---|---|
+| `gemini-3.5-flash-lite` | 0.8 s | 8–19 s |
+| `gemini-3.1-flash-lite` | 1.4–2.2 s | 1.9–3.3 s |
+
+The app uses `gemini-3.1-flash-lite` (the more consistent one, and the cheapest) with `gemini-3.5-flash-lite` as fallback. Each model gets one attempt with a 10-second deadline (the minimum the API accepts); on 429, 500, 503 or 504 (504 is what the API returns when the deadline passes) the next model in `CHAT_MODELS` answers. Other errors, such as an invalid request, are not retried on another model, because a second model would fail the same way. If every model fails, the user gets a clear 502 or 504 message instead of a long wait. A first version retried each model twice with a 20-second timeout; one answer took 38 seconds, which is why the retries were removed.
+
+In tests with the chosen model, 8 of 9 answers were correct in content and language; the ninth hit the timeout on both models during a slow period. On a paid tier or with reserved capacity, latency is expected to be more stable and the stronger model becomes a configuration change.
 
 ## 6. Embeddings: `gemini-embedding-2`, 768 dimensions
 
