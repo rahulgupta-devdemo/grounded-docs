@@ -6,7 +6,9 @@ from app.ingestion import IngestionError, ingest_pdf
 from app.schemas import ChatResponse, DocumentInfo
 from app.summarizing import DocumentNotAvailable, summarize_document
 
-MAX_UPLOAD_BYTES = 20 * 1024 * 1024
+# Product catalogues with images reach 40+ MB; nginx.conf must allow the same size.
+MAX_UPLOAD_MB = 100
+MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
@@ -21,7 +23,7 @@ def upload_document(file: UploadFile) -> DocumentInfo:
 
     data = file.file.read(MAX_UPLOAD_BYTES + 1)
     if len(data) > MAX_UPLOAD_BYTES:
-        raise HTTPException(413, "The file is larger than 20 MB.")
+        raise HTTPException(413, f"The file is larger than {MAX_UPLOAD_MB} MB.")
 
     try:
         return ingest_pdf(filename, data)

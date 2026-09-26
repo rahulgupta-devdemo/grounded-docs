@@ -120,7 +120,7 @@ The full reasoning, rejected alternatives and trade-offs are in **[DECISIONS.md]
 
 ## Testing
 
-71 automated tests cover chunking, PDF extraction, the Gemini integration (batching, fallback, error handling), upload, chat, file, summary and delete endpoints (including attempts to read other files through the file endpoint), citations, cost and language detection. They run in a few seconds without Docker or an API key: Qdrant runs in memory and the Gemini calls are replaced by fakes.
+72 automated tests cover chunking, PDF extraction, the Gemini integration (batching, fallback, error handling), upload, chat, file, summary and delete endpoints (including attempts to read other files through the file endpoint), citations, cost and language detection. They run in a few seconds without Docker or an API key: Qdrant runs in memory and the Gemini calls are replaced by fakes.
 
 ```bash
 cd backend
@@ -130,6 +130,10 @@ python -m venv .venv
 ```
 
 Behaviour the unit tests cannot prove was checked against the live API and recorded in DECISIONS.md: cross-language retrieval (a German question scores 0.77 against the matching English passage vs 0.69 against an unrelated one), answer language, answers to questions the documents do not cover, model latency during the day, and the full flow in Docker (including a 5 MB upload and data surviving a container restart).
+
+### Long real document
+
+A public 212-page product catalogue (41 MB) indexed in 119 seconds into 269 passages. Across six indexed documents, 9 of 9 questions about catalogue facts, in German and English, returned the correct value and cited the correct page, in 1.2–4.3 seconds; a summary of all 212 pages took 4.9 seconds and cost about $0.02. Uploads are limited to 100 MB.
 
 ### Retrieval evaluation
 

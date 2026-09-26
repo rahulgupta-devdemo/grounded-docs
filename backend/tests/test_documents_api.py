@@ -62,6 +62,15 @@ def test_list_is_empty_before_any_upload(client):
     assert client.get("/documents").json() == []
 
 
+def test_rejects_file_over_the_size_limit(client, monkeypatch):
+    from app.api import documents
+
+    monkeypatch.setattr(documents, "MAX_UPLOAD_BYTES", 10)
+    response = _upload(client, b"%PDF-" + b"x" * 20)
+
+    assert response.status_code == 413
+
+
 def test_rejects_non_pdf_filename(client):
     response = _upload(client, b"hello", filename="notes.txt")
 
