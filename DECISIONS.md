@@ -175,7 +175,7 @@ Added later: `DELETE /documents/{id}` removes a document's passages and its stor
 
 ## 18. Retrieval evaluation
 
-**Setup:** 24 questions (11 German, 13 English) on four public product documents from a lighting manufacturer: a product brochure in German and its English edition, and two datasheets for the same luminaire, one English (Bluetooth version) and one German (DALI version). Each question lists every page that holds the answer; for the brochure that is the matching page in either language. The script (`evaluation/run_eval.py`) uses the application's own parsing, chunking, embedding and search, with an in-memory Qdrant. Only retrieval is measured, not the answer model. Metrics: hit@k, the share of questions with a correct page in the top k; MRR, the mean of 1/rank of the first correct page (1.0 means always first).
+**Setup:** 24 questions (11 German, 13 English) on four public product documents from a lighting manufacturer: a product brochure in German and its English edition, and two datasheets for the same luminaire, one English (Bluetooth version) and one German (DALI version). Each question lists every page that holds the answer; for the brochure that is the matching page in either language. The documents and questions stay outside the repository; the question format is in `evaluation/questions.example.json`. The script (`evaluation/run_eval.py`) uses the application's own parsing, chunking, embedding and search, with an in-memory Qdrant. Only retrieval is measured, not the answer model. Metrics: hit@k, the share of questions with a correct page in the top k; MRR, the mean of 1/rank of the first correct page (1.0 means always first).
 
 | Chunk size / overlap | Passages | hit@1 | hit@3 | hit@5 | MRR |
 |---|---|---|---|---|---|

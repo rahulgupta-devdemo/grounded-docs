@@ -1,6 +1,6 @@
-# Document Chat
+# Grounded Docs
 
-Upload PDF documents and ask questions about them in English or German. Answers are based only on the uploaded documents, and every statement cites the file and page it comes from. A citation can be clicked to show the exact passage the answer was built from.
+A document chat with retrieval-augmented generation (RAG). Upload PDF documents and ask questions about them in English or German. Answers are based only on the uploaded documents, and every statement cites the file and page it comes from. A citation can be clicked to show the exact passage the answer was built from.
 
 ---
 
@@ -76,6 +76,22 @@ The frontend only ever calls `/api`. In development Vite forwards it to the back
 
 ---
 
+## Tech stack
+
+| Layer | Choice |
+|---|---|
+| Frontend | React 19, TypeScript, Vite, Tailwind CSS; served by nginx, which also proxies `/api` |
+| Backend | Python 3.13, FastAPI, Pydantic |
+| PDF extraction | PyMuPDF (text per page, in reading order) |
+| Embeddings | Google `gemini-embedding-2`, 768 dimensions, multilingual |
+| Answer model | Google `gemini-3.1-flash-lite`, fallback `gemini-3.5-flash-lite` |
+| Vector database | Qdrant 1.19 (cosine similarity, payload filtering) |
+| RAG orchestration | Own code: chunking, retrieval, prompt, citations, summaries |
+| Packaging | Docker Compose: frontend, backend, Qdrant; data on Docker volumes |
+| Tests | pytest with an in-memory Qdrant and fake model calls |
+
+---
+
 ## Key decisions
 
 The full reasoning, rejected alternatives and trade-offs are in **[DECISIONS.md](DECISIONS.md)**, written before the implementation and updated with measurements. In short:
@@ -91,6 +107,12 @@ The full reasoning, rejected alternatives and trade-offs are in **[DECISIONS.md]
 | Retrieval instead of whole documents in the prompt | About 2,000 tokens per question instead of ~100,000 for a long manual, scales to many documents, reliable citations | Long-context prompting (simpler for a single short document) |
 | 1,500-character passages | Measured: right page ranked first for 88% of 24 test questions, vs 83% with 3,000 | 3,000 (worse ranking), 800 (one question better, half the context per passage) |
 | One module per external system | `llm.py` is the only code that talks to Gemini, `vector_store.py` the only code that talks to Qdrant, so either can be replaced in one place | – |
+
+**Why Qdrant.** Search is often limited to selected documents, so metadata filtering is needed; Qdrant stores each passage's text, file and page next to its vector, so a search result is already a citation; and it is the kind of vector database a production setup would use, while running here as a single container. Chroma would have meant fewer moving parts but a weaker path to production, FAISS is a library without metadata or persistence, and pgvector makes sense where Postgres is already operated.
+
+**Why a lightweight custom RAG instead of LangChain.** RAG libraries were considered. The pipeline is short (extract, chunk, embed, store, retrieve, prompt, cite), and writing it directly keeps the parts that decide answer quality under direct control: where chunks are cut, which metadata travels with them, how the prompt is built and how citations are checked. It also removes a layer between the code and its behaviour when something goes wrong. With several retrievers, reranking or agent workflows, a framework would be worth revisiting.
+
+**Why Gemini for embeddings and answers.** One provider for both steps means one key and one SDK; the embedding model is multilingual, so a German question finds an English passage. Model names are configuration, not code, and all model calls sit behind two functions in `llm.py`.
 
 ---
 
@@ -109,19 +131,28 @@ Behaviour the unit tests cannot prove was checked against the live API and recor
 
 ### Retrieval evaluation
 
-24 questions in German and English on four public product documents from a lighting manufacturer (a product brochure in German and English, two datasheets), each with the pages that hold the answer. Analysis in DECISIONS.md, section 18.
+**Method.** A set of questions, each listing every page that holds its answer. The script indexes the documents with the application's own extraction, chunking and embedding code into a separate in-memory Qdrant, so a running instance is never touched, retrieves the top 5 passages per question and records the rank of the first passage from a correct page. Only retrieval is measured, not the answer model. Metrics:
 
-| Chunk size / overlap | hit@1 | hit@3 | hit@5 | MRR |
-|---|---|---|---|---|
-| 800 / 100 | 0.92 | 0.96 | 0.96 | 0.93 |
-| **1500 / 200 (default)** | 0.88 | 0.96 | 0.96 | 0.91 |
-| 3000 / 400 | 0.83 | 0.92 | 0.96 | 0.88 |
+- **hit@k**: share of questions with a correct page among the top k passages.
+- **MRR** (mean reciprocal rank): average of 1 / rank of the first correct page (1.0 means always first; a miss counts 0).
 
-All brochure questions find the right page first. The misses are datasheet questions by article number or across languages, which is why hybrid search is the first next step. The documents are not included in the repository. To run:
+**Data.** 24 questions (11 German, 13 English) on four public product documents from a lighting manufacturer: a 24-page product brochure in German, its 22-page English edition, and two 3-page technical datasheets, one English and one German. Questions cover facts in running text, numbers in specification tables, article numbers, and questions in one language whose answer is only in a document in the other. The documents and questions are not part of this repository.
+
+**Results.**
+
+| Chunk size / overlap (characters) | Passages | hit@1 | hit@3 | hit@5 | MRR |
+|---|---|---|---|---|---|
+| 800 / 100 | 71 | 0.92 | 0.96 | 0.96 | 0.93 |
+| **1500 / 200 (default)** | 54 | 0.88 | 0.96 | 0.96 | 0.91 |
+| 3000 / 400 | 44 | 0.83 | 0.92 | 0.96 | 0.88 |
+
+All brochure questions rank the right page first, in both languages. Every miss is a datasheet question: by article number, or in English about the German-only datasheet. Smaller passages rank better because a long specification page as one passage mixes too many facts. 1,500 was chosen over 800 because the difference is one question of 24, while 1,500 keeps twice the context per passage. Details in DECISIONS.md, section 18.
+
+**Run it on your own documents:** copy `evaluation/questions.example.json` to `evaluation/questions.json`, list your PDFs and questions, then:
 
 ```bash
 cd backend
-.venv/Scripts/python ../evaluation/run_eval.py --docs <folder with the four PDFs>
+.venv/Scripts/python ../evaluation/run_eval.py --docs <folder with the PDFs>
 ```
 
 ### Running without Docker (development)
@@ -184,6 +215,6 @@ frontend/
     components/        DocumentPanel, ChatPanel, Exchange, AnswerText, SourceList
   nginx.conf           serves the app, proxies /api to the backend
 docker-compose.yml     qdrant, backend, frontend
-evaluation/            retrieval evaluation: questions, script, results
+evaluation/            retrieval evaluation script and question format
 DECISIONS.md           decisions, alternatives, measurements
 ```

@@ -1,0 +1,12 @@
+{
+  "documents": {
+    "manual": "installation-manual.pdf",
+    "datasheet": "product-datasheet.pdf"
+  },
+  "questions": [
+    {"q": "What is the recommended mounting height?",
+     "expected": [["manual", 4]]},
+    {"q": "Welche Schutzart hat die Leuchte?",
+     "expected": [["datasheet", 1], ["datasheet", 2]]}
+  ]
+}

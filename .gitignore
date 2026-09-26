@@ -3,6 +3,12 @@
 .env.*
 !.env.example
 
+# Local documents and evaluation data (not published)
+*.pdf
+*.html
+!frontend/index.html
+evaluation/questions.json
+evaluation/results.md
 
 # Python
 __pycache__/
