@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, UploadFile
+from fastapi import APIRouter, HTTPException, Response, UploadFile
 from fastapi.responses import FileResponse
 
 from app import file_store, vector_store
@@ -32,6 +32,15 @@ def upload_document(file: UploadFile) -> DocumentInfo:
 @router.get("", response_model=list[DocumentInfo])
 def list_documents() -> list[DocumentInfo]:
     return vector_store.list_documents()
+
+
+@router.delete("/{document_id}", status_code=204)
+def delete_document(document_id: str) -> Response:
+    if vector_store.get_document(document_id) is None and file_store.path_for(document_id) is None:
+        raise HTTPException(404, "Document not found.")
+    vector_store.delete_document(document_id)
+    file_store.delete(document_id)
+    return Response(status_code=204)
 
 
 @router.get("/{document_id}/file", response_class=FileResponse)

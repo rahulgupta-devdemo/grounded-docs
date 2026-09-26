@@ -138,7 +138,8 @@ Current models accept around one million tokens, so the whole document could be 
 
 **Decision:** Three endpoints: `POST /documents` (upload and index), `GET /documents` (list), `POST /chat` (question in, answer with sources and cost out).
 **Why:** The API is the product boundary. The chat UI is one client; a script or a workflow automation tool could call the same endpoints.
-**Trade-off:** No delete or re-index endpoint in the baseline.
+Added later: `DELETE /documents/{id}` removes a document's passages and its stored PDF, `GET /documents/{id}/file` and `POST /documents/{id}/summary` (section 17).
+**Trade-off:** No re-index endpoint; changing chunk settings means uploading documents again.
 
 ## 14. Cost shown per answer
 

@@ -40,6 +40,10 @@ export function uploadDocument(file: File): Promise<DocumentInfo> {
   return request("/documents", { method: "POST", body });
 }
 
+export function deleteDocument(documentId: string): Promise<void> {
+  return request(`/documents/${documentId}`, { method: "DELETE" });
+}
+
 export function summarizeDocument(documentId: string): Promise<ChatResponse> {
   return request(`/documents/${documentId}/summary`, { method: "POST" });
 }
@@ -63,6 +67,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     const body = await response.json().catch(() => null);
     throw new Error(errorMessage(body) ?? `Request failed (${response.status})`);
   }
+  if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
 }
 

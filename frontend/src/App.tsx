@@ -29,6 +29,15 @@ export default function App() {
     setSelectedIds((ids) => new Set(ids).add(document.id));
   }
 
+  function handleDeleted(id: string) {
+    setDocuments((docs) => docs.filter((d) => d.id !== id));
+    setSelectedIds((ids) => {
+      const next = new Set(ids);
+      next.delete(id);
+      return next;
+    });
+  }
+
   function toggleSelected(id: string) {
     setSelectedIds((ids) => {
       const next = new Set(ids);
@@ -47,6 +56,7 @@ export default function App() {
         busy={chat.busy}
         onToggle={toggleSelected}
         onUploaded={handleUploaded}
+        onDeleted={handleDeleted}
         onSummarize={chat.summarize}
       />
       <ChatPanel

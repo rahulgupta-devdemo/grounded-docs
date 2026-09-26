@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 
-import { type DocumentInfo, fileUrl, uploadDocument } from "../api";
+import { deleteDocument, type DocumentInfo, fileUrl, uploadDocument } from "../api";
 
 type Props = {
   documents: DocumentInfo[];
@@ -9,6 +9,7 @@ type Props = {
   busy: boolean;
   onToggle: (id: string) => void;
   onUploaded: (document: DocumentInfo) => void;
+  onDeleted: (id: string) => void;
   onSummarize: (document: DocumentInfo) => void;
 };
 
@@ -19,11 +20,22 @@ export default function DocumentPanel({
   busy,
   onToggle,
   onUploaded,
+  onDeleted,
   onSummarize,
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState<string | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
+
+  async function remove(document: DocumentInfo) {
+    if (!window.confirm(`Delete ${document.filename}? Its passages and the stored PDF are removed.`)) return;
+    try {
+      await deleteDocument(document.id);
+      onDeleted(document.id);
+    } catch (error) {
+      setErrors([`${document.filename}: ${(error as Error).message}`]);
+    }
+  }
 
   async function uploadFiles(files: FileList | null) {
     if (!files) return;
@@ -112,6 +124,14 @@ export default function DocumentPanel({
                 <a href={fileUrl(doc.id)} download={doc.filename} className="text-slate-600 hover:underline">
                   Download
                 </a>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => remove(doc)}
+                  className="ml-auto text-red-600 hover:underline disabled:text-slate-400 disabled:no-underline"
+                >
+                  Delete
+                </button>
               </div>
             </li>
           ))}

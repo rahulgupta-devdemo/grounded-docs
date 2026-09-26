@@ -71,6 +71,13 @@ def replace_document(
     )
 
 
+def delete_document(document_id: str) -> None:
+    client = get_client()
+    name = collection_name()
+    if client.collection_exists(name):
+        client.delete(name, points_selector=_document_filter(document_id), wait=True)
+
+
 def list_documents() -> list[DocumentInfo]:
     return sorted(_first_chunks(), key=lambda d: d.filename.lower())
 

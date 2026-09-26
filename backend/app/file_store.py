@@ -16,6 +16,12 @@ def save(document_id: str, data: bytes) -> None:
     path.write_bytes(data)
 
 
+def delete(document_id: str) -> None:
+    path = path_for(document_id)
+    if path is not None:
+        path.unlink()
+
+
 def path_for(document_id: str) -> Path | None:
     """The stored file, or None if the id is invalid or nothing is stored."""
     if not _DOCUMENT_ID.fullmatch(document_id):

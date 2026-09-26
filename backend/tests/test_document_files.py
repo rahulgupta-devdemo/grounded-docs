@@ -96,6 +96,25 @@ def test_german_document_is_summarised_in_german(client, make_pdf, fake_generate
     assert fake_generate.prompts[0].endswith("Summarise this document in German.")
 
 
+def test_delete_removes_passages_and_file(client, datasheet, make_pdf, fake_generate):
+    document, _ = datasheet
+    other = make_pdf([["Installation height between 4 and 12 metres."]])
+    client.post("/documents", files={"file": ("manual.pdf", other, "application/pdf")})
+
+    response = client.delete(f"/documents/{document['id']}")
+
+    assert response.status_code == 204
+    assert [d["filename"] for d in client.get("/documents").json()] == ["manual.pdf"]
+    assert client.get(f"/documents/{document['id']}/file").status_code == 404
+    sources = client.post("/chat", json={"question": "IP66"}).json()["sources"]
+    assert {s["filename"] for s in sources} == {"manual.pdf"}
+
+
+@pytest.mark.parametrize("document_id", ["0123456789abcdef", "not-a-document-id"])
+def test_deleting_unknown_document_is_404(client, document_id):
+    assert client.delete(f"/documents/{document_id}").status_code == 404
+
+
 def test_summary_of_unknown_document_is_404(client, fake_generate):
     response = client.post("/documents/0123456789abcdef/summary")
 
