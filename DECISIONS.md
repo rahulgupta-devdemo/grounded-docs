@@ -156,6 +156,7 @@ Added later: `DELETE /documents/{id}` removes a document's passages and its stor
 **Why:** Running from the container on the reviewer's machine is a hard requirement, so Docker is set up at the start of the build and kept working, not added at the end.
 **Details:** The frontend image builds the app with Node and serves it with nginx, which also forwards `/api` to the backend; nginx's default 1 MB upload limit is raised to match the backend's 20 MB. The backend image uses the same Python version as local development. Base images and Qdrant are pinned to exact versions.
 **Verified:** a build from scratch takes about four minutes; a 5 MB upload goes through nginx; German and English questions are answered in 2–3 seconds; uploaded documents survive `docker compose down` and `up`.
+**Long-document test:** a 170-page, text-dense test manual (about 276,000 characters, 276 passages) indexed in 150 seconds on the free tier, close to nginx's former 180-second limit; a 250–300-page manual would have exceeded it and shown an error while indexing continued in the background. The proxy timeout is now 600 seconds and the UI says that large files can take minutes. With five documents and 330 passages indexed, a question took 1.5 seconds; a summary of the 170-page document (about 92,500 input tokens) took 3.8 seconds and cost $0.024. The real fix for large volumes is indexing as a background job with a progress indicator, listed under next steps.
 **Trade-off:** Requires Docker Desktop on the reviewer's machine.
 
 ## 16. Data protection and provider terms

@@ -175,6 +175,7 @@ cd frontend && npm install && npm run dev     # http://localhost:5173
 - **No conversation memory:** every question is answered on its own, so a follow-up like "and the 3000 K version?" lacks context.
 - **Single user:** no login; all uploaded documents are visible to everyone using the instance.
 - **Latency** on the free API tier varies during the day.
+- **Large uploads are slow on the free tier:** embeddings are limited to about 100 passages per minute. Measured: a 170-page manual (276 passages) took 150 seconds to index; the upload waits up to 10 minutes. With billing enabled the limit is much higher. For very large collections, indexing should move to a background job.
 
 ## Next steps, with more time
 
@@ -183,7 +184,7 @@ cd frontend && npm install && npm run dev     # http://localhost:5173
 3. **Scanned pages, tables and diagrams:** `gemini-embedding-2` can embed page images directly.
 4. **Conversation memory:** rewrite follow-up questions using the previous turns before retrieval.
 5. **Data protection for real documents:** Vertex AI in an EU region, or an open-weight model (for example `gpt-oss-120b`) on company or EU infrastructure, behind the same `generate()` interface.
-6. **Authentication** and per-user document access; ingestion as a background job for large files.
+6. **Authentication** and per-user document access; indexing as a background job with a progress indicator, so large uploads return immediately.
 7. **For larger document collections:** filters by metadata (product family, document type, date) beyond the file-name filter, stored chat sessions, suggested questions per document. Stored sessions are left out on purpose: they need users and a database first.
 8. **Integration:** the API works without the UI, so document sources or workflow automation can use the same endpoints.
 

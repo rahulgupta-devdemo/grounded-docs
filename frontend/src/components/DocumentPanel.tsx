@@ -156,6 +156,7 @@ export default function DocumentPanel({
         >
           {uploading ? t.indexing(uploading) : t.upload}
         </button>
+        {uploading && <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{t.indexingHint}</p>}
         {errors.map((error) => (
           <p key={error} className="mt-2 text-sm text-red-600 dark:text-red-400">
             {error}
