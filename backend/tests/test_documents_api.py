@@ -3,6 +3,7 @@ from fastapi.testclient import TestClient
 from google.genai import errors as genai_errors
 
 from app import llm
+from app.config import get_settings
 from app.main import app
 
 
@@ -107,6 +108,21 @@ def test_model_provider_error_returns_502_with_reason(client, make_pdf, monkeypa
 
     assert response.status_code == 502
     assert "Quota exceeded" in response.json()["detail"]
+
+
+def test_empty_api_key_is_explained_instead_of_a_bare_500(memory_qdrant, make_pdf, monkeypatch):
+    # .env copied from .env.example but the key not filled in.
+    monkeypatch.setenv("GEMINI_API_KEY", "")
+    get_settings.cache_clear()
+    llm._client.cache_clear()
+
+    with TestClient(app) as client:
+        response = _upload(client, make_pdf([["Some text."]]))
+        listed = client.get("/documents").json()
+
+    assert response.status_code == 503
+    assert "GEMINI_API_KEY is not set" in response.json()["detail"]
+    assert listed == []
 
 
 def test_rejects_pdf_without_text(client, make_pdf, fake_embeddings):

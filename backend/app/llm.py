@@ -35,10 +35,19 @@ class Generation:
     output_tokens: int  # includes thinking tokens, which are billed as output
 
 
+class MissingApiKeyError(RuntimeError):
+    """GEMINI_API_KEY is empty, typically because .env was copied but not filled in."""
+
+
 @lru_cache
 def _client() -> genai.Client:
+    api_key = get_settings().gemini_api_key.strip()
+    if not api_key:
+        raise MissingApiKeyError(
+            "GEMINI_API_KEY is not set. Add your key to the .env file and restart with docker compose up."
+        )
     return genai.Client(
-        api_key=get_settings().gemini_api_key,
+        api_key=api_key,
         http_options=types.HttpOptions(retry_options=_RETRY, timeout=60_000),
     )
 
