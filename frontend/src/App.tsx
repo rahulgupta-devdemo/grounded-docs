@@ -16,13 +16,32 @@ export default function App() {
   const chat = useChat();
   const t = messages[language];
 
+  // Loaded once when the page opens. Right after `docker compose up` the backend
+  // can need a few seconds more than nginx, so a failed load is retried for up to
+  // 20 seconds before the error is shown. Once loaded, nothing runs again.
   useEffect(() => {
-    listDocuments()
-      .then((docs) => {
-        setDocuments(docs);
-        setSelectedIds(new Set(docs.map((d) => d.id)));
-      })
-      .catch((error: Error) => setLoadError(error.message));
+    let cancelled = false;
+    let retry: ReturnType<typeof setTimeout> | undefined;
+
+    function load(attemptsLeft: number) {
+      listDocuments()
+        .then((docs) => {
+          if (cancelled) return;
+          setDocuments(docs);
+          setSelectedIds(new Set(docs.map((d) => d.id)));
+        })
+        .catch((error: Error) => {
+          if (cancelled) return;
+          if (attemptsLeft > 0) retry = setTimeout(() => load(attemptsLeft - 1), 2000);
+          else setLoadError(error.message);
+        });
+    }
+
+    load(10);
+    return () => {
+      cancelled = true;
+      clearTimeout(retry);
+    };
   }, []);
 
   useEffect(() => {
