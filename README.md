@@ -162,7 +162,7 @@ All brochure questions rank the right page first, in both languages. Every miss 
 | **Semantic (default)** | **0.88** | **0.96** | **0.96** | **0.91** | **22 of 24** |
 | Hybrid | 0.75 | 0.92 | 0.92 | 0.83 | 21 of 24 |
 
-Answer counts vary by about one between runs of the same setup (see below), so the retrieval columns carry this comparison. Semantic search is already strong on these documents, and an equally weighted keyword ranking mostly adds noise: words such as the product name occur on many pages. Keyword matching also cannot bridge languages: for an English question about the German datasheet, the English word "order" matched the English datasheet's "Order No." header and pulled the wrong document up. The default therefore stays semantic; `RETRIEVAL_MODE=hybrid` switches the experiment on, and both evaluation scripts compare the two modes.
+The answer evaluation varies between runs of the same setup (22 and 21 of 24, see below), so this comparison rests on the retrieval metrics, with the answer counts as an additional signal. Semantic search is already strong on these documents, and an equally weighted keyword ranking mostly adds noise: words such as the product name occur on many pages. Keyword matching also cannot bridge languages: for an English question about the German datasheet, the English word "order" matched the English datasheet's "Order No." header and pulled the wrong document up. The default therefore stays semantic; `RETRIEVAL_MODE=hybrid` switches the experiment on, and both evaluation scripts compare the two modes.
 
 ### Answer-quality evaluation
 
