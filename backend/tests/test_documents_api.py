@@ -58,6 +58,18 @@ def test_list_includes_every_document_beyond_one_page(client, make_pdf, monkeypa
     assert names == [f"doc-{i}.pdf" for i in range(5)]
 
 
+def test_upload_time_is_stored_and_listed(client, make_pdf):
+    from datetime import datetime, timedelta, timezone
+
+    before = datetime.now(timezone.utc)
+    uploaded = _upload(client, make_pdf([["Dated content."]])).json()
+    listed = client.get("/documents").json()[0]
+
+    uploaded_at = datetime.fromisoformat(listed["uploaded_at"])
+    assert before - timedelta(seconds=1) <= uploaded_at <= datetime.now(timezone.utc)
+    assert listed["uploaded_at"] == uploaded["uploaded_at"]
+
+
 def test_list_is_empty_before_any_upload(client):
     assert client.get("/documents").json() == []
 

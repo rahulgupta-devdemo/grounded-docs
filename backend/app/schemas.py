@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel, Field
 
 
@@ -6,6 +8,8 @@ class DocumentInfo(BaseModel):
     filename: str
     pages: int
     chunks: int
+    # UTC; None for documents indexed before upload times were stored.
+    uploaded_at: datetime | None = None
 
 
 class ChatRequest(BaseModel):
@@ -20,7 +24,7 @@ class Source(BaseModel):
     filename: str
     page: int
     text: str
-    score: float | None  # similarity to the question; None for summaries
+    score: float | None  # relevance to the question; None for summaries
     cited: bool
 
 

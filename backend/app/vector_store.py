@@ -74,6 +74,7 @@ def replace_document(
                     "filename": document.filename,
                     "page_count": document.pages,
                     "chunk_count": document.chunks,
+                    "uploaded_at": document.uploaded_at.isoformat() if document.uploaded_at else None,
                     "page": chunk.page,
                     "chunk_index": chunk.index,
                     "text": chunk.text,
@@ -131,6 +132,7 @@ def _first_chunks(document_id: str | None = None) -> list[DocumentInfo]:
                 filename=p.payload["filename"],
                 pages=p.payload["page_count"],
                 chunks=p.payload["chunk_count"],
+                uploaded_at=p.payload.get("uploaded_at"),
             )
             for p in points
         ]

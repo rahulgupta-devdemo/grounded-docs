@@ -1,4 +1,5 @@
 import hashlib
+from datetime import datetime, timezone
 
 from app import file_store, llm, vector_store
 from app.chunking import chunk_pages
@@ -31,6 +32,7 @@ def ingest_pdf(filename: str, data: bytes) -> DocumentInfo:
         filename=filename,
         pages=len(pages),
         chunks=len(chunks),
+        uploaded_at=datetime.now(timezone.utc),
     )
     vectors = llm.embed_documents([(filename, chunk.text) for chunk in chunks])
     vector_store.replace_document(document, chunks, vectors)

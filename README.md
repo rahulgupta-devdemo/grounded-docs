@@ -48,7 +48,7 @@ Only `GEMINI_API_KEY` is required. Everything else has a default.
 - **Choose where to search:** all documents, or a selection. With many documents, filter the list by file name and select or deselect all matches at once; the chat always shows how many documents it searches.
 - **Check** every answer: citations such as [1] open the source passage, and from there the original PDF at that page; passages retrieved but not used are listed separately.
 - **Summarise** a whole document with one click. Questions use a few retrieved passages; a summary sends the complete document text in one call and cites pages.
-- **Open, download or delete** documents. Deleting removes both the passages and the stored PDF.
+- **Open, download or delete** documents. Deleting removes both the passages and the stored PDF. The list shows when each document was uploaded and can be sorted by name or newest first; the panel can be widened for long file names.
 - **Say "not found"** when the documents do not contain the answer, instead of guessing.
 - **Work across languages:** a German question can be answered from an English datasheet and the other way round; the answer is always in the language of the question.
 - **Show the cost:** each answer shows the model used, tokens and cost (typically well below $0.01).
@@ -121,7 +121,7 @@ The full reasoning, rejected alternatives and trade-offs are in **[DECISIONS.md]
 
 ## Testing
 
-83 automated tests cover chunking, PDF extraction, the Gemini integration (batching, fallback, error handling), upload, chat, file, summary and delete endpoints (including attempts to read other files through the file endpoint), citations and their validation, cost, language detection and the optional hybrid search. They run in a few seconds without Docker or an API key: Qdrant runs in memory and the Gemini calls are replaced by fakes.
+84 automated tests cover chunking, PDF extraction, the Gemini integration (batching, fallback, error handling), upload, chat, file, summary and delete endpoints (including attempts to read other files through the file endpoint), citations and their validation, cost, language detection and the optional hybrid search. They run in a few seconds without Docker or an API key: Qdrant runs in memory and the Gemini calls are replaced by fakes.
 
 ```bash
 cd backend

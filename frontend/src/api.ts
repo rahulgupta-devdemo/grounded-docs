@@ -5,6 +5,7 @@ export type DocumentInfo = {
   filename: string;
   pages: number;
   chunks: number;
+  uploaded_at: string | null; // ISO date-time, UTC
 };
 
 export type Source = {

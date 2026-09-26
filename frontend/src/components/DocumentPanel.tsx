@@ -1,8 +1,15 @@
-import { useRef, useState } from "react";
+import { type KeyboardEvent, type PointerEvent, useEffect, useRef, useState } from "react";
 
 import { deleteDocument, type DocumentInfo, fileUrl, uploadDocument } from "../api";
 import { type Language, useT } from "../i18n";
-import type { Theme } from "../preferences";
+import {
+  clampSidebarWidth,
+  initialSidebarWidth,
+  save,
+  SIDEBAR_MAX,
+  SIDEBAR_MIN,
+  type Theme,
+} from "../preferences";
 
 type Props = {
   documents: DocumentInfo[];
@@ -72,10 +79,46 @@ export default function DocumentPanel({
   const [uploading, setUploading] = useState<string | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
   const [query, setQuery] = useState("");
+  const [sortOrder, setSortOrder] = useState<"name" | "newest">("name");
+  const [width, setWidth] = useState(initialSidebarWidth);
+
+  useEffect(() => save("sidebarWidth", String(width)), [width]);
+
+  function startResize(event: PointerEvent<HTMLDivElement>) {
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = width;
+    const move = (e: globalThis.PointerEvent) => setWidth(clampSidebarWidth(startWidth + e.clientX - startX));
+    const stop = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", stop);
+      document.body.style.userSelect = "";
+    };
+    // No text selection while dragging.
+    document.body.style.userSelect = "none";
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", stop);
+  }
+
+  function resizeWithKeys(event: KeyboardEvent<HTMLDivElement>) {
+    const step = event.key === "ArrowRight" ? 20 : event.key === "ArrowLeft" ? -20 : 0;
+    if (step) {
+      event.preventDefault();
+      setWidth((current) => clampSidebarWidth(current + step));
+    }
+  }
 
   const needle = query.trim().toLowerCase();
-  const shown = needle ? documents.filter((d) => d.filename.toLowerCase().includes(needle)) : documents;
+  const filtered = needle ? documents.filter((d) => d.filename.toLowerCase().includes(needle)) : documents;
+  const shown = [...filtered].sort(
+    sortOrder === "name"
+      ? (a, b) => a.filename.localeCompare(b.filename)
+      : // ISO dates sort as strings; documents without a date go last.
+        (a, b) => (b.uploaded_at ?? "").localeCompare(a.uploaded_at ?? ""),
+  );
   const shownIds = shown.map((d) => d.id);
+  const formatDate = (iso: string) =>
+    new Date(iso).toLocaleString(t.locale, { dateStyle: "short", timeStyle: "short" });
 
   async function remove(document: DocumentInfo) {
     if (!window.confirm(t.confirmDelete(document.filename))) return;
@@ -103,7 +146,23 @@ export default function DocumentPanel({
   }
 
   return (
-    <aside className="flex w-80 shrink-0 flex-col border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+    <aside
+      style={{ width }}
+      className="relative flex shrink-0 flex-col border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
+    >
+      <div
+        role="separator"
+        aria-orientation="vertical"
+        aria-label={t.resizePanel}
+        aria-valuemin={SIDEBAR_MIN}
+        aria-valuemax={SIDEBAR_MAX}
+        aria-valuenow={width}
+        title={t.resizePanel}
+        tabIndex={0}
+        onPointerDown={startResize}
+        onKeyDown={resizeWithKeys}
+        className="absolute top-0 -right-1 z-10 h-full w-2 cursor-col-resize hover:bg-slate-300 focus:bg-slate-400 focus:outline-none dark:hover:bg-slate-700 dark:focus:bg-slate-600"
+      />
       <header className="border-b border-slate-200 p-4 dark:border-slate-800">
         <div className="flex items-center justify-between gap-2">
           <h1 className="text-lg font-semibold">{t.appTitle}</h1>
@@ -181,6 +240,17 @@ export default function DocumentPanel({
               placeholder={t.filterPlaceholder}
               className="w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm focus:border-slate-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:focus:border-slate-400"
             />
+            <label className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+              {t.sortBy}
+              <select
+                value={sortOrder}
+                onChange={(e) => setSortOrder(e.target.value as "name" | "newest")}
+                className="rounded-md border border-slate-300 bg-white px-1 py-0.5 text-xs text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+              >
+                <option value="name">{t.sortName}</option>
+                <option value="newest">{t.sortNewest}</option>
+              </select>
+            </label>
             <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
               <span>{needle ? t.shownOf(shown.length, documents.length) : t.documentCount(documents.length)}</span>
               <button
@@ -218,6 +288,9 @@ export default function DocumentPanel({
                   <span className="block text-xs text-slate-500 dark:text-slate-400">
                     {t.pages(doc.pages)} · {t.passages(doc.chunks)}
                   </span>
+                  {doc.uploaded_at && (
+                    <span className="block text-xs text-slate-400 dark:text-slate-500">{formatDate(doc.uploaded_at)}</span>
+                  )}
                 </span>
               </label>
               <div className="mt-1 flex gap-3 pl-6 text-xs">
