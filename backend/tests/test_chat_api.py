@@ -3,7 +3,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app import llm
-from app.answering import NO_DOCUMENTS_ANSWER, cited_numbers
+from app.answering import NO_DOCUMENTS_ANSWER, cited_numbers, keep_valid_citations
 from app.main import app
 
 
@@ -100,6 +100,28 @@ def test_timeout_of_all_models_returns_504_with_reason(client, two_documents, mo
 
     assert response.status_code == 504
     assert "did not respond in time" in response.json()["detail"]
+
+
+def test_citations_to_passages_the_model_never_saw_are_removed(client, two_documents, fake_generate):
+    fake_generate.answer = "The luminaire is IP66 [1][9]. Flux is 4200 lm [7]. Height [1, 8]."
+
+    body = _ask(client, "What is the protection class IP66?").json()
+
+    assert body["answer"] == "The luminaire is IP66 [1]. Flux is 4200 lm. Height [1]."
+    assert [s["number"] for s in body["sources"] if s["cited"]] == [1]
+
+
+@pytest.mark.parametrize(
+    ("answer", "expected"),
+    [
+        ("IP66 [1].", "IP66 [1]."),
+        ("IP66 [6].", "IP66."),
+        ("IP66 [1, 6] and IK08 [2][6].", "IP66 [1] and IK08 [2]."),
+        ("No citation.", "No citation."),
+    ],
+)
+def test_keep_valid_citations(answer, expected):
+    assert keep_valid_citations(answer, valid={1, 2, 3, 4, 5}) == expected
 
 
 def test_empty_question_is_rejected(client):

@@ -137,6 +137,8 @@ Current models accept around one million tokens, so the whole document could be 
 
 **No documents selected:** the model is not called at all, so there is no cost and no chance of an answer without sources.
 
+**Citations are validated:** the backend removes citation numbers that point to no passage the model was given (for summaries: page numbers that were not sent), so every citation in an answer can be opened. In the 64 answers of the two evaluation runs no invalid citation occurred; the check is a safety net, not a fix for an observed failure.
+
 ## 13. API
 
 **Decision:** Three endpoints: `POST /documents` (upload and index), `GET /documents` (list), `POST /chat` (question in, answer with sources and cost out).

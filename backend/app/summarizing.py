@@ -6,7 +6,7 @@ one document in a single call, which long-context models handle well.
 """
 
 from app import file_store, llm, vector_store
-from app.answering import cited_numbers
+from app.answering import cited_numbers, keep_valid_citations
 from app.language import detect_language
 from app.pdf_parser import extract_pages
 from app.pricing import generation_cost
@@ -53,7 +53,9 @@ def summarize_document(document_id: str) -> ChatResponse:
     )
     generation = llm.generate(SUMMARY_INSTRUCTION, prompt, timeout_seconds=SUMMARY_TIMEOUT_SECONDS)
 
-    answer = generation.text
+    # Page markers the model was not given cannot be opened as sources.
+    answer = keep_valid_citations(generation.text, valid={page.number for page in included})
+    cited = cited_numbers(answer)
     if len(included) < len(pages):
         first, last = included[0].number, included[-1].number
         covered = f"page {first}" if first == last else f"pages {first}–{last}"
@@ -62,7 +64,6 @@ def summarize_document(document_id: str) -> ChatResponse:
             "the document is longer than the summary limit.)"
         )
 
-    cited = cited_numbers(generation.text)
     return ChatResponse(
         answer=answer,
         sources=[

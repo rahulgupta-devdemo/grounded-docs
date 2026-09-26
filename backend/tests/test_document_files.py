@@ -68,6 +68,16 @@ def test_summary_returns_cited_pages_as_sources(client, datasheet, fake_generate
     assert body["usage"]["model"] == "gemini-3.5-flash-lite"
 
 
+def test_summary_drops_citations_of_pages_that_were_not_sent(client, datasheet, fake_generate):
+    document, _ = datasheet
+    fake_generate.answer = "A datasheet [1]. Mentioned elsewhere [40]."
+
+    body = client.post(f"/documents/{document['id']}/summary").json()
+
+    assert body["answer"] == "A datasheet [1]. Mentioned elsewhere."
+    assert [s["page"] for s in body["sources"]] == [1]
+
+
 @pytest.mark.parametrize(
     ("limit", "covered"),
     [(80, "pages 1–2"), (40, "page 1")],  # page lengths: 30, 47, 28 characters
