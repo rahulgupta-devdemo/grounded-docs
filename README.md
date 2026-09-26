@@ -203,6 +203,7 @@ cd frontend && npm install && npm run dev     # http://localhost:5173
 - **No conversation memory:** every question is answered on its own, so a follow-up like "and the 3000 K version?" lacks context.
 - **Single user:** no login; all uploaded documents are visible to everyone using the instance.
 - **Latency** on the free API tier varies during the day.
+- **The free tier also has a daily embedding limit** (about 1,000 texts at the time of writing, resetting at midnight Pacific time). Normal use stays far below it, but repeated evaluation runs and several large uploads on one day can exhaust it; uploads then fail with a clear quota message while questions keep working until the last embeddings are used.
 - **Large uploads are slow on the free tier:** embeddings are limited to about 100 passages per minute. Measured: a 170-page manual (276 passages) took 150 seconds to index; the upload waits up to 10 minutes. With billing enabled the limit is much higher. For very large collections, indexing should move to a background job.
 
 ## Next steps, with more time
