@@ -154,11 +154,25 @@ A public 212-page product catalogue (41 MB) indexed in 119 seconds into 269 pass
 
 All brochure questions rank the right page first, in both languages. Every miss is a datasheet question: by article number, or in English about the German-only datasheet. Smaller passages rank better because a long specification page as one passage mixes too many facts. 1,500 was chosen over 800 because the difference is one question of 24, while 1,500 keeps twice the context per passage. Details in DECISIONS.md, section 18.
 
-**Run it on your own documents:** copy `evaluation/questions.example.json` to `evaluation/questions.json`, list your PDFs and questions, then:
+### Answer-quality evaluation
+
+The same 24 questions went through the full pipeline (retrieval, prompt, answer model, citations), together with 8 questions the documents cannot answer (price, warranty, delivery time, reference customers, ATEX approval, production CO₂, packaging colour, the manufacturer's CEO). Each answer was checked automatically for the expected facts, and each "not answerable" question for a clear statement that the documents do not contain the information; the two automatic misses were then checked by hand.
+
+| Check | Result |
+|---|---|
+| Answer contains the expected facts | **22 of 24** |
+| Answer cites a page that holds the answer | 23 of 24 |
+| Unanswerable question correctly declined | **8 of 8** |
+| Invented values across all 32 answers | none found |
+
+Both misses are the datasheet cases the retrieval evaluation already pointed to. An English question about a value that only exists in the German datasheet found the right page but not the passage with the value, and the answer said the documents do not contain it: wrong, but a safe failure rather than a guess. A question about "certifications" was answered with the product family's certificate list from the brochure, which is correct there, but missed the approval marks listed in the datasheet.
+
+**Run them on your own documents:** copy `evaluation/questions.example.json` to `evaluation/questions.json`, list your PDFs, questions, expected pages and expected facts, then:
 
 ```bash
 cd backend
-.venv/Scripts/python ../evaluation/run_eval.py --docs <folder with the PDFs>
+.venv/Scripts/python ../evaluation/run_eval.py --docs <folder with the PDFs>          # retrieval
+.venv/Scripts/python ../evaluation/run_answer_eval.py --docs <folder with the PDFs>   # answers
 ```
 
 ### Running without Docker (development)
@@ -222,6 +236,6 @@ frontend/
     components/        DocumentPanel, ChatPanel, Exchange, AnswerText, SourceList
   nginx.conf           serves the app, proxies /api to the backend
 docker-compose.yml     qdrant, backend, frontend
-evaluation/            retrieval evaluation script and question format
+evaluation/            retrieval and answer-quality evaluation scripts, question format
 DECISIONS.md           decisions, alternatives, measurements
 ```

@@ -5,8 +5,13 @@
   },
   "questions": [
     {"q": "What is the recommended mounting height?",
-     "expected": [["manual", 4]]},
+     "expected": [["manual", 4]],
+     "answer": ["4\\s?(to|-|–)\\s?8\\s?m"]},
     {"q": "Welche Schutzart hat die Leuchte?",
-     "expected": [["datasheet", 1], ["datasheet", 2]]}
+     "expected": [["datasheet", 1], ["datasheet", 2]],
+     "answer": ["IP\\s?66"]}
+  ],
+  "unanswerable": [
+    "What is the price of the luminaire?"
   ]
 }
