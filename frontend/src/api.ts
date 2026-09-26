@@ -53,7 +53,8 @@ export function fileUrl(documentId: string, page?: number): string {
   return `/api/documents/${documentId}/file${page ? `#page=${page}` : ""}`;
 }
 
-export function askQuestion(question: string, documentIds: string[]): Promise<ChatResponse> {
+// documentIds null searches all documents.
+export function askQuestion(question: string, documentIds: string[] | null): Promise<ChatResponse> {
   return request("/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },

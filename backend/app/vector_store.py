@@ -11,6 +11,9 @@ from app.config import get_settings
 from app.schemas import DocumentInfo
 
 
+_PAGE_SIZE = 1000
+
+
 @dataclass(frozen=True)
 class SearchHit:
     document_id: str
@@ -100,22 +103,29 @@ def _first_chunks(document_id: str | None = None) -> list[DocumentInfo]:
         conditions.append(
             models.FieldCondition(key="document_id", match=models.MatchValue(value=document_id))
         )
-    points, _ = client.scroll(
-        name,
-        scroll_filter=models.Filter(must=conditions),
-        limit=1000,
-        with_payload=True,
-        with_vectors=False,
-    )
-    return [
-        DocumentInfo(
-            id=p.payload["document_id"],
-            filename=p.payload["filename"],
-            pages=p.payload["page_count"],
-            chunks=p.payload["chunk_count"],
+    # Read page by page, so the list is complete however many documents exist.
+    documents: list[DocumentInfo] = []
+    offset = None
+    while True:
+        points, offset = client.scroll(
+            name,
+            scroll_filter=models.Filter(must=conditions),
+            limit=_PAGE_SIZE,
+            offset=offset,
+            with_payload=True,
+            with_vectors=False,
         )
-        for p in points
-    ]
+        documents += [
+            DocumentInfo(
+                id=p.payload["document_id"],
+                filename=p.payload["filename"],
+                pages=p.payload["page_count"],
+                chunks=p.payload["chunk_count"],
+            )
+            for p in points
+        ]
+        if offset is None:
+            return documents
 
 
 def search(vector: list[float], limit: int, document_ids: list[str] | None = None) -> list[SearchHit]:

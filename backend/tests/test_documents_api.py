@@ -46,6 +46,18 @@ def test_uploading_same_file_twice_does_not_duplicate(client, make_pdf):
     assert len(client.get("/documents").json()) == 1
 
 
+def test_list_includes_every_document_beyond_one_page(client, make_pdf, monkeypatch):
+    from app import vector_store
+
+    monkeypatch.setattr(vector_store, "_PAGE_SIZE", 2)
+    for i in range(5):
+        _upload(client, make_pdf([[f"Document number {i}."]]), filename=f"doc-{i}.pdf")
+
+    names = [d["filename"] for d in client.get("/documents").json()]
+
+    assert names == [f"doc-{i}.pdf" for i in range(5)]
+
+
 def test_list_is_empty_before_any_upload(client):
     assert client.get("/documents").json() == []
 

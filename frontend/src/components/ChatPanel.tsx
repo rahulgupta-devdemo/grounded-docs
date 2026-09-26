@@ -7,10 +7,11 @@ type Props = {
   messages: Message[];
   busy: boolean;
   hasDocuments: boolean;
+  scope: string | null;
   onAsk: (question: string) => void;
 };
 
-export default function ChatPanel({ messages, busy, hasDocuments, onAsk }: Props) {
+export default function ChatPanel({ messages, busy, hasDocuments, scope, onAsk }: Props) {
   const [question, setQuestion] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -65,6 +66,7 @@ export default function ChatPanel({ messages, busy, hasDocuments, onAsk }: Props
             Ask
           </button>
         </div>
+        {scope && <p className="mx-auto mt-2 max-w-3xl text-xs text-slate-500">{scope}</p>}
       </form>
     </main>
   );

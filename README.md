@@ -44,7 +44,8 @@ Only `GEMINI_API_KEY` is required. Everything else has a default.
 ## What it does
 
 - **Upload** one or more PDFs. Each is split into passages that stay within one page, embedded, and stored in Qdrant with file name and page number.
-- **Ask** a question. The five most relevant passages are retrieved, optionally limited to selected documents, and the model answers only from them.
+- **Ask** a question. The five most relevant passages are retrieved, and the model answers only from them.
+- **Choose where to search:** all documents, or a selection. With many documents, filter the list by file name and select or deselect all matches at once; the chat always shows how many documents it searches.
 - **Check** every answer: citations such as [1] open the source passage, and from there the original PDF at that page; passages retrieved but not used are listed separately.
 - **Summarise** a whole document with one click. Questions use a few retrieved passages; a summary sends the complete document text in one call and cites pages.
 - **Open, download or delete** documents. Deleting removes both the passages and the stored PDF.
@@ -118,7 +119,7 @@ The full reasoning, rejected alternatives and trade-offs are in **[DECISIONS.md]
 
 ## Testing
 
-70 automated tests cover chunking, PDF extraction, the Gemini integration (batching, fallback, error handling), upload, chat, file, summary and delete endpoints (including attempts to read other files through the file endpoint), citations, cost and language detection. They run in a few seconds without Docker or an API key: Qdrant runs in memory and the Gemini calls are replaced by fakes.
+71 automated tests cover chunking, PDF extraction, the Gemini integration (batching, fallback, error handling), upload, chat, file, summary and delete endpoints (including attempts to read other files through the file endpoint), citations, cost and language detection. They run in a few seconds without Docker or an API key: Qdrant runs in memory and the Gemini calls are replaced by fakes.
 
 ```bash
 cd backend
@@ -182,7 +183,7 @@ cd frontend && npm install && npm run dev     # http://localhost:5173
 4. **Conversation memory:** rewrite follow-up questions using the previous turns before retrieval.
 5. **Data protection for real documents:** Vertex AI in an EU region, or an open-weight model (for example `gpt-oss-120b`) on company or EU infrastructure, behind the same `generate()` interface.
 6. **Authentication** and per-user document access; ingestion as a background job for large files.
-7. **For larger document collections:** search and filters in the document list, stored chat sessions, suggested questions per document. Left out on purpose: with a handful of documents they add little, and stored sessions need users and a database first.
+7. **For larger document collections:** filters by metadata (product family, document type, date) beyond the file-name filter, stored chat sessions, suggested questions per document. Stored sessions are left out on purpose: they need users and a database first.
 8. **Integration:** the API works without the UI, so document sources or workflow automation can use the same endpoints.
 
 ---

@@ -47,6 +47,22 @@ export default function App() {
     });
   }
 
+  function setSelected(ids: string[], selected: boolean) {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      for (const id of ids) {
+        if (selected) next.add(id);
+        else next.delete(id);
+      }
+      return next;
+    });
+  }
+
+  const selectedCount = documents.filter((d) => selectedIds.has(d.id)).length;
+  const allSelected = documents.length > 0 && selectedCount === documents.length;
+  // With everything selected, search all documents instead of sending every id.
+  const searchScope = allSelected ? null : documents.filter((d) => selectedIds.has(d.id)).map((d) => d.id);
+
   return (
     <div className="flex h-screen bg-slate-50 text-slate-900">
       <DocumentPanel
@@ -55,6 +71,7 @@ export default function App() {
         loadError={loadError}
         busy={chat.busy}
         onToggle={toggleSelected}
+        onSelect={setSelected}
         onUploaded={handleUploaded}
         onDeleted={handleDeleted}
         onSummarize={chat.summarize}
@@ -63,7 +80,14 @@ export default function App() {
         messages={chat.messages}
         busy={chat.busy}
         hasDocuments={documents.length > 0}
-        onAsk={(question) => chat.ask(question, [...selectedIds])}
+        scope={
+          documents.length === 0
+            ? null
+            : allSelected
+              ? `Searching all ${documents.length} documents`
+              : `Searching ${selectedCount} of ${documents.length} documents`
+        }
+        onAsk={(question) => chat.ask(question, searchScope)}
       />
     </div>
   );

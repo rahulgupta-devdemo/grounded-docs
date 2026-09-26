@@ -35,7 +35,7 @@ export function useChat() {
   return {
     messages,
     busy,
-    ask: (question: string, documentIds: string[]) =>
+    ask: (question: string, documentIds: string[] | null) =>
       run("question", question, () => askQuestion(question, documentIds)),
     summarize: (document: DocumentInfo) =>
       run("summary", `Summary of ${document.filename}`, () => summarizeDocument(document.id)),

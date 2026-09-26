@@ -8,6 +8,7 @@ type Props = {
   loadError: string | null;
   busy: boolean;
   onToggle: (id: string) => void;
+  onSelect: (ids: string[], selected: boolean) => void;
   onUploaded: (document: DocumentInfo) => void;
   onDeleted: (id: string) => void;
   onSummarize: (document: DocumentInfo) => void;
@@ -19,6 +20,7 @@ export default function DocumentPanel({
   loadError,
   busy,
   onToggle,
+  onSelect,
   onUploaded,
   onDeleted,
   onSummarize,
@@ -26,6 +28,11 @@ export default function DocumentPanel({
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState<string | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
+  const [query, setQuery] = useState("");
+
+  const needle = query.trim().toLowerCase();
+  const shown = needle ? documents.filter((d) => d.filename.toLowerCase().includes(needle)) : documents;
+  const shownIds = shown.map((d) => d.id);
 
   async function remove(document: DocumentInfo) {
     if (!window.confirm(`Delete ${document.filename}? Its passages and the stored PDF are removed.`)) return;
@@ -89,8 +96,39 @@ export default function DocumentPanel({
         {documents.length === 0 && !loadError && (
           <p className="text-sm text-slate-500">No documents yet. Upload a PDF to start.</p>
         )}
+        {documents.length > 0 && (
+          <div className="mb-2 space-y-1">
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Filter documents by name…"
+              className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:border-slate-500 focus:outline-none"
+            />
+            <div className="flex items-center gap-3 text-xs text-slate-500">
+              <span>
+                {needle ? `${shown.length} of ${documents.length} shown` : `${documents.length} documents`}
+              </span>
+              <button
+                type="button"
+                onClick={() => onSelect(shownIds, true)}
+                className="ml-auto font-medium text-slate-700 hover:underline"
+              >
+                Select shown
+              </button>
+              <button
+                type="button"
+                onClick={() => onSelect(shownIds, false)}
+                className="font-medium text-slate-700 hover:underline"
+              >
+                Deselect shown
+              </button>
+            </div>
+          </div>
+        )}
+        {needle && shown.length === 0 && <p className="text-sm text-slate-500">No document name matches.</p>}
         <ul className="space-y-1">
-          {documents.map((doc) => (
+          {shown.map((doc) => (
             <li key={doc.id} className="rounded-md p-2 hover:bg-slate-50">
               <label className="flex cursor-pointer items-start gap-2">
                 <input
