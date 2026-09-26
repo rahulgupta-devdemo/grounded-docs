@@ -20,7 +20,7 @@ class Source(BaseModel):
     filename: str
     page: int
     text: str
-    score: float
+    score: float | None  # similarity to the question; None for summaries
     cited: bool
 
 

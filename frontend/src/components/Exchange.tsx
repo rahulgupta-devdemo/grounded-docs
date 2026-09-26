@@ -1,8 +1,8 @@
 import { useState } from "react";
 
 import type { Usage } from "../api";
+import type { Message } from "../useChat";
 import AnswerText from "./AnswerText";
-import type { Message } from "./ChatPanel";
 import SourceList from "./SourceList";
 
 export default function Exchange({ message }: { message: Message }) {
@@ -24,7 +24,11 @@ export default function Exchange({ message }: { message: Message }) {
       </div>
 
       <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-        {message.status === "loading" && <p className="text-sm text-slate-500">Searching the documents…</p>}
+        {message.status === "loading" && (
+          <p className="text-sm text-slate-500">
+            {message.kind === "summary" ? "Reading the whole document…" : "Searching the documents…"}
+          </p>
+        )}
         {message.status === "error" && <p className="text-sm text-red-600">{message.error}</p>}
         {message.status === "done" && message.response && (
           <>

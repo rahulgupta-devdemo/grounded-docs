@@ -1,51 +1,29 @@
 import { type FormEvent, useEffect, useRef, useState } from "react";
 
-import { askQuestion, type ChatResponse } from "../api";
+import type { Message } from "../useChat";
 import Exchange from "./Exchange";
 
-export type Message = {
-  id: number;
-  question: string;
-  status: "loading" | "done" | "error";
-  response?: ChatResponse;
-  error?: string;
-  seconds?: number;
-};
-
 type Props = {
-  documentIds: string[];
+  messages: Message[];
+  busy: boolean;
   hasDocuments: boolean;
+  onAsk: (question: string) => void;
 };
 
-export default function ChatPanel({ documentIds, hasDocuments }: Props) {
-  const [messages, setMessages] = useState<Message[]>([]);
+export default function ChatPanel({ messages, busy, hasDocuments, onAsk }: Props) {
   const [question, setQuestion] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
-  const busy = messages.some((m) => m.status === "loading");
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  function update(id: number, patch: Partial<Message>) {
-    setMessages((current) => current.map((m) => (m.id === id ? { ...m, ...patch } : m)));
-  }
-
-  async function submit(event: FormEvent) {
+  function submit(event: FormEvent) {
     event.preventDefault();
     const text = question.trim();
     if (!text || busy) return;
-
-    const id = Date.now();
-    setMessages((current) => [...current, { id, question: text, status: "loading" }]);
+    onAsk(text);
     setQuestion("");
-    const started = performance.now();
-    try {
-      const response = await askQuestion(text, documentIds);
-      update(id, { status: "done", response, seconds: (performance.now() - started) / 1000 });
-    } catch (error) {
-      update(id, { status: "error", error: (error as Error).message });
-    }
   }
 
   return (
@@ -57,7 +35,10 @@ export default function ChatPanel({ documentIds, hasDocuments }: Props) {
               <p className="text-lg font-medium text-slate-700">
                 {hasDocuments ? "Ask a question about your documents" : "Upload a PDF to get started"}
               </p>
-              <p className="mt-1 text-sm">Questions in English or German. Every answer cites its sources.</p>
+              <p className="mt-1 text-sm">
+                Questions in English or German. Every answer cites its sources.
+                {hasDocuments && " Use “Summary” next to a document for an overview."}
+              </p>
             </div>
           )}
           {messages.map((message) => (

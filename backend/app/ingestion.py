@@ -1,6 +1,6 @@
 import hashlib
 
-from app import llm, vector_store
+from app import file_store, llm, vector_store
 from app.chunking import chunk_pages
 from app.config import get_settings
 from app.pdf_parser import InvalidPdfError, extract_pages
@@ -34,4 +34,5 @@ def ingest_pdf(filename: str, data: bytes) -> DocumentInfo:
     )
     vectors = llm.embed_documents([(filename, chunk.text) for chunk in chunks])
     vector_store.replace_document(document, chunks, vectors)
+    file_store.save(document.id, data)
     return document

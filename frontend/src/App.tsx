@@ -3,11 +3,13 @@ import { useEffect, useState } from "react";
 import { type DocumentInfo, listDocuments } from "./api";
 import ChatPanel from "./components/ChatPanel";
 import DocumentPanel from "./components/DocumentPanel";
+import { useChat } from "./useChat";
 
 export default function App() {
   const [documents, setDocuments] = useState<DocumentInfo[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [loadError, setLoadError] = useState<string | null>(null);
+  const chat = useChat();
 
   useEffect(() => {
     listDocuments()
@@ -42,10 +44,17 @@ export default function App() {
         documents={documents}
         selectedIds={selectedIds}
         loadError={loadError}
+        busy={chat.busy}
         onToggle={toggleSelected}
         onUploaded={handleUploaded}
+        onSummarize={chat.summarize}
       />
-      <ChatPanel documentIds={[...selectedIds]} hasDocuments={documents.length > 0} />
+      <ChatPanel
+        messages={chat.messages}
+        busy={chat.busy}
+        hasDocuments={documents.length > 0}
+        onAsk={(question) => chat.ask(question, [...selectedIds])}
+      />
     </div>
   );
 }

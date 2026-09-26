@@ -1,16 +1,26 @@
 import { useRef, useState } from "react";
 
-import { type DocumentInfo, uploadDocument } from "../api";
+import { type DocumentInfo, fileUrl, uploadDocument } from "../api";
 
 type Props = {
   documents: DocumentInfo[];
   selectedIds: Set<string>;
   loadError: string | null;
+  busy: boolean;
   onToggle: (id: string) => void;
   onUploaded: (document: DocumentInfo) => void;
+  onSummarize: (document: DocumentInfo) => void;
 };
 
-export default function DocumentPanel({ documents, selectedIds, loadError, onToggle, onUploaded }: Props) {
+export default function DocumentPanel({
+  documents,
+  selectedIds,
+  loadError,
+  busy,
+  onToggle,
+  onUploaded,
+  onSummarize,
+}: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState<string | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
@@ -69,8 +79,8 @@ export default function DocumentPanel({ documents, selectedIds, loadError, onTog
         )}
         <ul className="space-y-1">
           {documents.map((doc) => (
-            <li key={doc.id}>
-              <label className="flex cursor-pointer items-start gap-2 rounded-md p-2 hover:bg-slate-50">
+            <li key={doc.id} className="rounded-md p-2 hover:bg-slate-50">
+              <label className="flex cursor-pointer items-start gap-2">
                 <input
                   type="checkbox"
                   className="mt-1"
@@ -87,6 +97,22 @@ export default function DocumentPanel({ documents, selectedIds, loadError, onTog
                   </span>
                 </span>
               </label>
+              <div className="mt-1 flex gap-3 pl-6 text-xs">
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => onSummarize(doc)}
+                  className="font-medium text-slate-700 hover:underline disabled:text-slate-400 disabled:no-underline"
+                >
+                  Summary
+                </button>
+                <a href={fileUrl(doc.id)} target="_blank" rel="noreferrer" className="text-slate-600 hover:underline">
+                  Open
+                </a>
+                <a href={fileUrl(doc.id)} download={doc.filename} className="text-slate-600 hover:underline">
+                  Download
+                </a>
+              </div>
             </li>
           ))}
         </ul>

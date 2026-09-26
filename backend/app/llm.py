@@ -55,14 +55,14 @@ def embed_query(question: str) -> list[float]:
     return _embed([f"task: question answering | query: {question}"])[0]
 
 
-def generate(system_instruction: str, prompt: str) -> Generation:
+def generate(system_instruction: str, prompt: str, timeout_seconds: int | None = None) -> Generation:
     """Answer with the first configured model that responds in time."""
     settings = get_settings()
     # Answers are interactive: one attempt per model with a short deadline,
     # then the next model, instead of waiting through retries and backoff.
     http_options = types.HttpOptions(
         retry_options=types.HttpRetryOptions(attempts=1),
-        timeout=settings.chat_timeout_seconds * 1000,
+        timeout=(timeout_seconds or settings.chat_timeout_seconds) * 1000,
     )
     last_error: Exception | None = None
     for model in settings.chat_model_list:

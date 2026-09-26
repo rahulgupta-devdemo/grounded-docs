@@ -24,7 +24,7 @@ Open **http://localhost:8080**. The first build takes about four minutes.
 | http://localhost:8000/docs | Interactive API documentation (FastAPI) |
 | http://localhost:6333/dashboard | Qdrant dashboard: stored passages and vectors |
 
-Stop with `docker compose down`. Uploaded documents are kept in a Docker volume; `docker compose down -v` deletes them.
+Stop with `docker compose down`. Uploaded documents are kept in Docker volumes; `docker compose down -v` deletes them.
 
 ### Environment variables
 
@@ -45,7 +45,9 @@ Only `GEMINI_API_KEY` is required. Everything else has a default.
 
 - **Upload** one or more PDFs. Each is split into passages that stay within one page, embedded, and stored in Qdrant with file name and page number.
 - **Ask** a question. The five most relevant passages are retrieved, optionally limited to selected documents, and the model answers only from them.
-- **Check** every answer: citations such as [1] open the source passage; passages retrieved but not used are listed separately.
+- **Check** every answer: citations such as [1] open the source passage, and from there the original PDF at that page; passages retrieved but not used are listed separately.
+- **Summarise** a whole document with one click. Questions use a few retrieved passages; a summary sends the complete document text in one call and cites pages.
+- **Open or download** the original PDFs.
 - **Say "not found"** when the documents do not contain the answer, instead of guessing.
 - **Work across languages:** a German question can be answered from an English datasheet and the other way round; the answer is always in the language of the question.
 - **Show the cost:** each answer shows the model used, tokens and cost (typically well below $0.01).
@@ -64,7 +66,11 @@ Browser ──► nginx (frontend container, :8080)
 
 **Upload** (`POST /documents`): PDF → text per page (PyMuPDF) → passages of up to 3,000 characters with 400 characters overlap, cut at paragraph or sentence boundaries → one 768-dimensional vector per passage (`gemini-embedding-2`) → stored in Qdrant with file, page and text. The document id is a hash of the file content, so uploading the same file again replaces it instead of creating duplicates.
 
+The original PDF is kept on a Docker volume, so it can be opened at a cited page (`GET /documents/{id}/file#page=N`) or downloaded. Only ids of the form produced by the hash are accepted, so the endpoint cannot be used to read other files.
+
 **Question** (`POST /chat`): question → vector → the 5 most similar passages (cosine similarity) → prompt with numbered passages and the rules: use only these passages, cite them, say when the answer is missing, answer in the question's language → answer with citations, all retrieved passages and the cost.
+
+**Summary** (`POST /documents/{id}/summary`): the full text of the stored PDF, with each page marked, is sent in one call (up to about 100,000 tokens, roughly $0.03); the summary cites pages and is written in the document's language. Retrieval suits specific questions; a summary needs the whole document, which is where long-context models are the better tool.
 
 The frontend only ever calls `/api`. In development Vite forwards it to the backend, in Docker nginx does, so the browser talks to a single origin and no backend URL is built into the app.
 
@@ -89,7 +95,7 @@ The full reasoning, rejected alternatives and trade-offs are in **[DECISIONS.md]
 
 ## Testing
 
-56 automated tests cover chunking, PDF extraction, the Gemini integration (batching, fallback, error handling), upload and chat endpoints, citations, cost and language detection. They run in a few seconds without Docker or an API key: Qdrant runs in memory and the Gemini calls are replaced by fakes.
+67 automated tests cover chunking, PDF extraction, the Gemini integration (batching, fallback, error handling), upload, chat, file and summary endpoints (including attempts to read other files through the file endpoint), citations, cost and language detection. They run in a few seconds without Docker or an API key: Qdrant runs in memory and the Gemini calls are replaced by fakes.
 
 ```bash
 cd backend
@@ -114,7 +120,7 @@ cd frontend && npm install && npm run dev     # http://localhost:5173
 
 - **Text PDFs only.** Scanned pages, and content inside images, tables drawn as graphics or diagrams, are not read. Uploading a scanned PDF returns a clear message.
 - **Exact identifiers** such as article numbers can be missed by pure vector search.
-- **Whole-document questions** ("summarise the document") see only the 5 retrieved passages; the answer says so.
+- **Whole-document questions typed into the chat** ("summarise the document") see only the 5 retrieved passages; the answer says so and the Summary button covers the whole document. Summaries are limited to about 100,000 tokens; for longer documents the summary states which pages it covers.
 - **No conversation memory:** every question is answered on its own, so a follow-up like "and the 3000 K version?" lacks context.
 - **Single user:** no login; all uploaded documents are visible to everyone using the instance.
 - **Latency** on the free API tier varies during the day.
@@ -124,10 +130,10 @@ cd frontend && npm install && npm run dev     # http://localhost:5173
 1. **Retrieval evaluation:** a set of questions with the page that holds each answer; measure hit rate and mean reciprocal rank, and use it to tune chunk size and top-k.
 2. **Hybrid search and reranking:** keyword search alongside vector search for article numbers and codes; rerank the top 20 passages.
 3. **Scanned pages, tables and diagrams:** `gemini-embedding-2` can embed page images directly.
-4. **Whole-document summaries:** send the complete document in one call, where long context is the better tool.
-5. **Conversation memory:** rewrite follow-up questions using the previous turns before retrieval.
-6. **Data protection for real documents:** Vertex AI in an EU region, or an open-weight model (for example `gpt-oss-120b`) on company or EU infrastructure, behind the same `generate()` interface.
-7. **Authentication** and per-user document access; ingestion as a background job for large files.
+4. **Conversation memory:** rewrite follow-up questions using the previous turns before retrieval.
+5. **Data protection for real documents:** Vertex AI in an EU region, or an open-weight model (for example `gpt-oss-120b`) on company or EU infrastructure, behind the same `generate()` interface.
+6. **Authentication** and per-user document access; ingestion as a background job for large files.
+7. **For larger document collections:** search and filters in the document list, stored chat sessions, suggested questions per document. Left out on purpose: with a handful of documents they add little, and stored sessions need users and a database first.
 8. **Integration:** the API works without the UI, so document sources or workflow automation can use the same endpoints.
 
 ---
@@ -144,7 +150,9 @@ backend/
     pdf_parser.py      PDF → text per page
     chunking.py        pages → passages
     ingestion.py       upload pipeline
+    file_store.py      original PDFs (open, download, summarise)
     answering.py       question pipeline, prompt, citations
+    summarizing.py     whole-document summaries
     llm.py             all Gemini calls (embeddings, answers, fallback)
     vector_store.py    all Qdrant calls
     language.py        German / English detection
@@ -154,6 +162,7 @@ frontend/
   src/
     api.ts             typed API client
     App.tsx            document list and selection
+    useChat.ts         chat state for questions and summaries
     components/        DocumentPanel, ChatPanel, Exchange, AnswerText, SourceList
   nginx.conf           serves the app, proxies /api to the backend
 docker-compose.yml     qdrant, backend, frontend

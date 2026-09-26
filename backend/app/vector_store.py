@@ -72,6 +72,15 @@ def replace_document(
 
 
 def list_documents() -> list[DocumentInfo]:
+    return sorted(_first_chunks(), key=lambda d: d.filename.lower())
+
+
+def get_document(document_id: str) -> DocumentInfo | None:
+    documents = _first_chunks(document_id)
+    return documents[0] if documents else None
+
+
+def _first_chunks(document_id: str | None = None) -> list[DocumentInfo]:
     client = get_client()
     name = collection_name()
     if not client.collection_exists(name):
@@ -79,16 +88,19 @@ def list_documents() -> list[DocumentInfo]:
 
     # Every document has exactly one chunk with index 0; its payload carries
     # the document-level fields.
+    conditions = [models.FieldCondition(key="chunk_index", match=models.MatchValue(value=0))]
+    if document_id is not None:
+        conditions.append(
+            models.FieldCondition(key="document_id", match=models.MatchValue(value=document_id))
+        )
     points, _ = client.scroll(
         name,
-        scroll_filter=models.Filter(
-            must=[models.FieldCondition(key="chunk_index", match=models.MatchValue(value=0))]
-        ),
+        scroll_filter=models.Filter(must=conditions),
         limit=1000,
         with_payload=True,
         with_vectors=False,
     )
-    documents = [
+    return [
         DocumentInfo(
             id=p.payload["document_id"],
             filename=p.payload["filename"],
@@ -97,7 +109,6 @@ def list_documents() -> list[DocumentInfo]:
         )
         for p in points
     ]
-    return sorted(documents, key=lambda d: d.filename.lower())
 
 
 def search(vector: list[float], limit: int, document_ids: list[str] | None = None) -> list[SearchHit]:

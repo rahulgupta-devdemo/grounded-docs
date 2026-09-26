@@ -1,4 +1,4 @@
-import type { Source } from "../api";
+import { fileUrl, type Source } from "../api";
 
 type Props = {
   sources: Source[];
@@ -54,14 +54,24 @@ function SourceItems({ sources, active, onSelect, elementId }: Props) {
               <span className="min-w-0 flex-1 truncate">
                 {source.filename} <span className="text-slate-500">· page {source.page}</span>
               </span>
-              <span className="text-xs text-slate-400" title="Cosine similarity to the question">
-                {source.score.toFixed(2)}
-              </span>
+              {source.score !== null && (
+                <span className="text-xs text-slate-400" title="Cosine similarity to the question">
+                  {source.score.toFixed(2)}
+                </span>
+              )}
             </button>
             {isActive && (
-              <p className="border-t border-slate-200 px-3 py-2 text-sm whitespace-pre-wrap text-slate-700">
-                {source.text}
-              </p>
+              <div className="border-t border-slate-200 px-3 py-2">
+                <p className="text-sm whitespace-pre-wrap text-slate-700">{source.text}</p>
+                <a
+                  href={fileUrl(source.document_id, source.page)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-2 inline-block text-xs font-medium text-slate-700 hover:underline"
+                >
+                  Open page {source.page} in the PDF ↗
+                </a>
+              </div>
             )}
           </li>
         );

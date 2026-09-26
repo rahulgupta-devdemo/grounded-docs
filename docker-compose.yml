@@ -11,6 +11,9 @@ services:
     env_file: .env
     environment:
       QDRANT_URL: http://qdrant:6333
+      DOCUMENTS_DIR: /data/documents
+    volumes:
+      - documents:/data/documents
     ports:
       - "8000:8000"
     depends_on:
@@ -25,3 +28,4 @@ services:
 
 volumes:
   qdrant_storage:
+  documents:

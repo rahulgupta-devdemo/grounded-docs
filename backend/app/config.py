@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     top_k: int = 5
 
     qdrant_url: str = "http://localhost:6333"
+    documents_dir: str = "data/documents"
 
     @property
     def chat_model_list(self) -> list[str]:

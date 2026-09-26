@@ -1,8 +1,10 @@
 from fastapi import APIRouter, HTTPException, UploadFile
+from fastapi.responses import FileResponse
 
-from app import vector_store
+from app import file_store, vector_store
 from app.ingestion import IngestionError, ingest_pdf
-from app.schemas import DocumentInfo
+from app.schemas import ChatResponse, DocumentInfo
+from app.summarizing import DocumentNotAvailable, summarize_document
 
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024
 
@@ -30,3 +32,21 @@ def upload_document(file: UploadFile) -> DocumentInfo:
 @router.get("", response_model=list[DocumentInfo])
 def list_documents() -> list[DocumentInfo]:
     return vector_store.list_documents()
+
+
+@router.get("/{document_id}/file", response_class=FileResponse)
+def get_document_file(document_id: str) -> FileResponse:
+    path = file_store.path_for(document_id)
+    if path is None:
+        raise HTTPException(404, "The original file is not available.")
+    # No filename header: the browser shows the PDF inline, and "#page=N"
+    # in the URL opens it at a page. The UI sets the name for downloads.
+    return FileResponse(path, media_type="application/pdf")
+
+
+@router.post("/{document_id}/summary", response_model=ChatResponse)
+def summarize(document_id: str) -> ChatResponse:
+    try:
+        return summarize_document(document_id)
+    except DocumentNotAvailable as exc:
+        raise HTTPException(404, str(exc)) from exc

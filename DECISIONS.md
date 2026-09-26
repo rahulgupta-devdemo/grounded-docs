@@ -161,7 +161,16 @@ Current models accept around one million tokens, so the whole document could be 
 - The paid Gemini API does not guarantee where data is processed. For confidential documents that must stay in the EU, the next step is to run the same models through Vertex AI in an EU region. The application code stays the same; only the client configuration changes.
 - The demo uses public documents only.
 
-## 17. Evaluation (planned)
+## 17. Original files and whole-document summaries
+
+**Decision:** Keep the original PDF on its own Docker volume. Serve it for viewing (the UI links to `#page=N`, so a citation opens the PDF at the cited page) and download. Add a Summary action per document that sends the document's complete text, with page markers, in one call.
+**Why:** Users need to check an answer in the original, not only in the extracted passage. And a summary is a whole-document task: retrieval would give the model five passages and a summary of those would look complete while missing most of the document. For this task, sending everything is the right tool, the same trade-off as in section 11 from the other side. The summary is written in the document's language and cites pages.
+**Security:** The file endpoint only accepts ids of exactly 16 hex characters, the form the content hash produces, so a request cannot point at another file on the server. Tested directly and through nginx; in addition the API key is not a file in the container at all, only an environment variable.
+**Limits:** Summaries send up to about 400,000 characters (about 100,000 tokens, roughly $0.03) and get 60 seconds instead of 10. Longer documents are summarised from the first pages, and the summary says which pages it covers.
+**Left out on purpose:** search in the document list, stored chat sessions and suggested questions. They help with large collections and many users; for a handful of documents they add little, and stored sessions need users and a database first.
+**Trade-off:** Documents uploaded before this change have no stored file and must be uploaded again to be opened or summarised.
+
+## 18. Evaluation (planned)
 
 A set of test questions, each with the page that contains the answer. Metrics: hit rate at 1, 3 and 5 (is the right page among the top results) and mean reciprocal rank (how high it appears). Used to compare two or three chunk sizes. Results will be added here.
 

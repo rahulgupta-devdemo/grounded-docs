@@ -13,7 +13,7 @@ export type Source = {
   filename: string;
   page: number;
   text: string;
-  score: number;
+  score: number | null; // similarity to the question; null for summaries
   cited: boolean;
 };
 
@@ -38,6 +38,15 @@ export function uploadDocument(file: File): Promise<DocumentInfo> {
   const body = new FormData();
   body.append("file", file);
   return request("/documents", { method: "POST", body });
+}
+
+export function summarizeDocument(documentId: string): Promise<ChatResponse> {
+  return request(`/documents/${documentId}/summary`, { method: "POST" });
+}
+
+// "#page=N" makes the browser's PDF viewer open at that page.
+export function fileUrl(documentId: string, page?: number): string {
+  return `/api/documents/${documentId}/file${page ? `#page=${page}` : ""}`;
 }
 
 export function askQuestion(question: string, documentIds: string[]): Promise<ChatResponse> {

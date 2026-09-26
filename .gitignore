@@ -18,6 +18,7 @@ dist/
 # Local data
 qdrant_storage/
 uploads/
+data/
 
 # OS / editor
 .DS_Store

@@ -11,8 +11,9 @@ from app.config import get_settings
 
 
 @pytest.fixture(autouse=True)
-def settings_env(monkeypatch):
+def settings_env(monkeypatch, tmp_path):
     monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    monkeypatch.setenv("DOCUMENTS_DIR", str(tmp_path / "documents"))
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()
@@ -53,9 +54,11 @@ class FakeGenerator:
     def __init__(self):
         self.answer = "IP66 [1]"
         self.prompts: list[str] = []
+        self.timeouts: list[int | None] = []
 
-    def __call__(self, system_instruction, prompt):
+    def __call__(self, system_instruction, prompt, timeout_seconds=None):
         self.prompts.append(prompt)
+        self.timeouts.append(timeout_seconds)
         return llm.Generation(
             text=self.answer, model="gemini-3.5-flash-lite", input_tokens=1000, output_tokens=100
         )
