@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { askQuestion, type ChatResponse, type DocumentInfo, summarizeDocument } from "./api";
+import { askQuestion, type ChatResponse, summarizeDocument } from "./api";
 
 export type Message = {
   id: number;
@@ -37,7 +37,7 @@ export function useChat() {
     busy,
     ask: (question: string, documentIds: string[] | null) =>
       run("question", question, () => askQuestion(question, documentIds)),
-    summarize: (document: DocumentInfo) =>
-      run("summary", `Summary of ${document.filename}`, () => summarizeDocument(document.id)),
+    summarize: (documentId: string, label: string) =>
+      run("summary", label, () => summarizeDocument(documentId)),
   };
 }

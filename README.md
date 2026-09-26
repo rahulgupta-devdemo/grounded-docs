@@ -53,6 +53,7 @@ Only `GEMINI_API_KEY` is required. Everything else has a default.
 - **Work across languages:** a German question can be answered from an English datasheet and the other way round; the answer is always in the language of the question.
 - **Show the cost:** each answer shows the model used, tokens and cost (typically well below $0.01).
 - **Stay available:** if an answer model is overloaded or takes longer than 10 seconds, the next configured model answers.
+- **Interface in English or German**, with a light and a dark theme. Both follow the browser and system settings at first and remember the user's choice.
 
 ---
 

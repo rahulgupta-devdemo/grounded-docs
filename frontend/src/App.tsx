@@ -3,13 +3,18 @@ import { useEffect, useState } from "react";
 import { type DocumentInfo, listDocuments } from "./api";
 import ChatPanel from "./components/ChatPanel";
 import DocumentPanel from "./components/DocumentPanel";
+import { I18nProvider, type Language, messages } from "./i18n";
+import { initialLanguage, initialTheme, save, type Theme } from "./preferences";
 import { useChat } from "./useChat";
 
 export default function App() {
   const [documents, setDocuments] = useState<DocumentInfo[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [language, setLanguage] = useState<Language>(initialLanguage);
+  const [theme, setTheme] = useState<Theme>(initialTheme);
   const chat = useChat();
+  const t = messages[language];
 
   useEffect(() => {
     listDocuments()
@@ -19,6 +24,17 @@ export default function App() {
       })
       .catch((error: Error) => setLoadError(error.message));
   }, []);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", theme === "dark");
+    save("theme", theme);
+  }, [theme]);
+
+  useEffect(() => {
+    document.documentElement.lang = language;
+    document.title = t.appTitle;
+    save("language", language);
+  }, [language, t]);
 
   function handleUploaded(document: DocumentInfo) {
     setDocuments((docs) =>
@@ -64,31 +80,37 @@ export default function App() {
   const searchScope = allSelected ? null : documents.filter((d) => selectedIds.has(d.id)).map((d) => d.id);
 
   return (
-    <div className="flex h-screen bg-slate-50 text-slate-900">
-      <DocumentPanel
-        documents={documents}
-        selectedIds={selectedIds}
-        loadError={loadError}
-        busy={chat.busy}
-        onToggle={toggleSelected}
-        onSelect={setSelected}
-        onUploaded={handleUploaded}
-        onDeleted={handleDeleted}
-        onSummarize={chat.summarize}
-      />
-      <ChatPanel
-        messages={chat.messages}
-        busy={chat.busy}
-        hasDocuments={documents.length > 0}
-        scope={
-          documents.length === 0
-            ? null
-            : allSelected
-              ? `Searching all ${documents.length} documents`
-              : `Searching ${selectedCount} of ${documents.length} documents`
-        }
-        onAsk={(question) => chat.ask(question, searchScope)}
-      />
-    </div>
+    <I18nProvider value={t}>
+      <div className="flex h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+        <DocumentPanel
+          documents={documents}
+          selectedIds={selectedIds}
+          loadError={loadError}
+          busy={chat.busy}
+          language={language}
+          theme={theme}
+          onLanguageChange={setLanguage}
+          onThemeChange={setTheme}
+          onToggle={toggleSelected}
+          onSelect={setSelected}
+          onUploaded={handleUploaded}
+          onDeleted={handleDeleted}
+          onSummarize={(doc) => chat.summarize(doc.id, t.summaryOf(doc.filename))}
+        />
+        <ChatPanel
+          messages={chat.messages}
+          busy={chat.busy}
+          hasDocuments={documents.length > 0}
+          scope={
+            documents.length === 0
+              ? null
+              : allSelected
+                ? t.scopeAll(documents.length)
+                : t.scopeSome(selectedCount, documents.length)
+          }
+          onAsk={(question) => chat.ask(question, searchScope)}
+        />
+      </div>
+    </I18nProvider>
   );
 }

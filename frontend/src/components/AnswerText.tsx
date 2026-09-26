@@ -1,3 +1,5 @@
+import { useT } from "../i18n";
+
 // Same citation format the backend parses: [1], [2][3], [1, 4].
 const CITATION = /(\[\d+(?:\s*,\s*\d+)*\])/;
 const BOLD = /(\*\*[^*]+\*\*)/;
@@ -10,6 +12,7 @@ type Props = {
 };
 
 export default function AnswerText({ text, onCite }: Props) {
+  const t = useT();
   return (
     <p className="text-[15px] leading-relaxed whitespace-pre-wrap">
       {text.replace(BULLET, "$1• ").split(CITATION).map((part, i) =>
@@ -23,8 +26,8 @@ export default function AnswerText({ text, onCite }: Props) {
                 key={`${i}-${number}`}
                 type="button"
                 onClick={() => onCite(number)}
-                title={`Show source ${number}`}
-                className="mx-0.5 rounded bg-slate-200 px-1.5 align-baseline text-xs font-semibold text-slate-700 hover:bg-slate-300"
+                title={t.showSource(number)}
+                className="mx-0.5 rounded bg-slate-200 px-1.5 align-baseline text-xs font-semibold text-slate-700 hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600"
               >
                 {number}
               </button>

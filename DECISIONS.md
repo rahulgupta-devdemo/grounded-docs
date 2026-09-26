@@ -31,6 +31,7 @@ The guiding rule: a small system that works end to end and where every step can 
 **Why:** The UI is one screen (documents, chat, sources) that talks to a REST API. TypeScript catches mismatches between the UI and the API response shapes at build time.
 **Rejected:** Next.js. Server-side rendering and routing add setup without benefit for a single screen that calls an existing API.
 **Trade-off:** No server-side rendering, which this app does not need.
+**Added later:** the interface in English and German, and a light and dark theme. All interface text is in one typed file, so a missing German text fails the build instead of showing up empty. Answers already follow the language of the question; the switch only changes the interface. Error messages from the API stay in English. No i18n library: two languages and about forty strings do not need one.
 
 ## 3. Backend: Python and FastAPI
 

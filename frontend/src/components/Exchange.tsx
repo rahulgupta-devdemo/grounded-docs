@@ -1,11 +1,13 @@
 import { useState } from "react";
 
 import type { Usage } from "../api";
+import { type Messages, useT } from "../i18n";
 import type { Message } from "../useChat";
 import AnswerText from "./AnswerText";
 import SourceList from "./SourceList";
 
 export default function Exchange({ message }: { message: Message }) {
+  const t = useT();
   const [activeSource, setActiveSource] = useState<number | null>(null);
 
   function showSource(number: number) {
@@ -20,16 +22,18 @@ export default function Exchange({ message }: { message: Message }) {
   return (
     <article className="space-y-3">
       <div className="flex justify-end">
-        <p className="max-w-[80%] rounded-lg bg-slate-900 px-4 py-2 text-sm text-white">{message.question}</p>
+        <p className="max-w-[80%] rounded-lg bg-slate-900 px-4 py-2 text-sm text-white dark:bg-slate-700">
+          {message.question}
+        </p>
       </div>
 
-      <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         {message.status === "loading" && (
-          <p className="text-sm text-slate-500">
-            {message.kind === "summary" ? "Reading the whole document…" : "Searching the documents…"}
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            {message.kind === "summary" ? t.loadingSummary : t.loadingQuestion}
           </p>
         )}
-        {message.status === "error" && <p className="text-sm text-red-600">{message.error}</p>}
+        {message.status === "error" && <p className="text-sm text-red-600 dark:text-red-400">{message.error}</p>}
         {message.status === "done" && message.response && (
           <>
             <AnswerText text={message.response.answer} onCite={showSource} />
@@ -41,7 +45,7 @@ export default function Exchange({ message }: { message: Message }) {
                 elementId={(n) => sourceElementId(message.id, n)}
               />
             )}
-            {message.response.usage && <UsageLine usage={message.response.usage} seconds={message.seconds} />}
+            {message.response.usage && <UsageLine usage={message.response.usage} seconds={message.seconds} t={t} />}
           </>
         )}
       </div>
@@ -49,12 +53,16 @@ export default function Exchange({ message }: { message: Message }) {
   );
 }
 
-function UsageLine({ usage, seconds }: { usage: Usage; seconds?: number }) {
+function UsageLine({ usage, seconds, t }: { usage: Usage; seconds?: number; t: Messages }) {
   const cost =
-    usage.cost_usd === null ? "cost unknown" : usage.cost_usd < 0.0001 ? "< $0.0001" : `$${usage.cost_usd.toFixed(4)}`;
-  const parts = [usage.model, `${usage.input_tokens} in / ${usage.output_tokens} out tokens`, cost];
+    usage.cost_usd === null ? t.costUnknown : usage.cost_usd < 0.0001 ? "< $0.0001" : `$${usage.cost_usd.toFixed(4)}`;
+  const parts = [usage.model, t.tokens(usage.input_tokens, usage.output_tokens), cost];
   if (seconds !== undefined) parts.push(`${seconds.toFixed(1)} s`);
-  return <p className="mt-3 border-t border-slate-100 pt-2 text-xs text-slate-400">{parts.join(" · ")}</p>;
+  return (
+    <p className="mt-3 border-t border-slate-100 pt-2 text-xs text-slate-400 dark:border-slate-800 dark:text-slate-500">
+      {parts.join(" · ")}
+    </p>
+  );
 }
 
 function sourceElementId(messageId: number, number: number): string {
