@@ -50,7 +50,7 @@ The guiding rule: a small system that works end to end and where every step can 
 
 **Decision:** Google Gemini for both embeddings and answer generation. The rest of the code only calls two functions, `embed()` and `generate()`. Model names are configuration (`.env`), not code.
 **Why:** One provider for both steps means one API key, one SDK and one set of rate limits. The Gemini models are multilingual, which matters for a German company with German and English documents. Keeping model names in configuration matters because model generations change quickly.
-**Rejected:** OpenAI (comparable quality and price; no advantage for this task and requires prepaid credit). Anthropic (no embedding API, so a second provider would be needed). xAI Grok (no embedding model in its API, and its cheapest models cost $1.25 per million input tokens against $0.25 for the Gemini model used; its larger context window does not matter when each question sends about 4,000 tokens). OpenAI's open-weight `gpt-oss-120b` on Groq (fast and cheap, but no embedding model, so a second provider and key, and its free tier allows 8,000 tokens per minute, about two questions per minute with full-size passages). A local model via Ollama (no API cost, but a multi-gigabyte install on the reviewer's machine and slower answers).
+**Rejected:** OpenAI (comparable quality and price; no advantage for this task and requires prepaid credit). Anthropic (no embedding API, so a second provider would be needed). xAI Grok (no embedding model in its API, and its cheapest models cost $1.25 per million input tokens against $0.25 for the Gemini model used; its larger context window does not matter when each question sends about 2,000 tokens). OpenAI's open-weight `gpt-oss-120b` on Groq (fast and cheap, but no embedding model, so a second provider and key, and its free tier allows 8,000 tokens per minute, about four questions per minute). A local model via Ollama (no API cost, but a multi-gigabyte install on the reviewer's machine and slower answers).
 **Trade-off:** Dependence on an external API and its rate limits. Switching provider means implementing `embed()` and `generate()` for the new SDK and re-embedding the documents.
 
 **Answer model, chosen by measurement:** the plan was the newest stable Flash model (`gemini-3.8-flash`). Tested on the free tier on 2026-09-25, it returned `503 model overloaded` on every call, and `gemini-3.5-flash` timed out after 60 seconds. The two Flash-Lite models were the only ones that answered reliably, but their speed changed during the day:
@@ -79,6 +79,8 @@ In tests with the chosen model, 8 of 9 answers were correct in content and langu
 
 **Verified against the live API:** a batch of 20 chunks returns 20 distinct 768-dimensional vectors of length 1.0. A German question ("Welche Schutzart hat die Leuchte?") scored 0.77 against an English passage about IP66 and 0.69 against an English passage about luminous flux, so cross-language retrieval ranks the right passage higher.
 
+**Quota, found by the evaluation:** the free tier allows 100 embedding requests per minute, and a run was stopped after about 100 embedded passages although they were sent in batches of 20. Batching saves round trips, not quota. Uploads therefore retry with waits adding up to about a minute (they can wait; chat answers cannot), and on the free tier a single upload of more than about 100 passages will be slow. Billing raises the limit.
+
 **Rejected:** `gemini-embedding-001`. Batching is simpler, but it is the older model, limited to 2,048 input tokens and text only. It remains the fallback if rate limits for the newer model are too tight.
 **Trade-off:** Per-chunk wrapping is slightly more code than a plain list.
 
@@ -98,7 +100,7 @@ In tests with the chosen model, 8 of 9 answers were correct in content and langu
 
 ## 9. Chunking: fixed size with overlap, within a page
 
-**Decision:** Split each page's text into chunks of a fixed maximum length with overlap, preferring paragraph and sentence boundaries. Chunks do not cross page boundaries. Each chunk stores document id, file name, page number and chunk index. Initial size: ~3,000 characters (~800 tokens) with ~400 characters overlap. Final values are set by the retrieval evaluation.
+**Decision:** Split each page's text into chunks of a fixed maximum length with overlap, preferring paragraph and sentence boundaries. Chunks do not cross page boundaries. Each chunk stores document id, file name, page number and chunk index. Size: 1,500 characters (~400 tokens) with 200 characters overlap, chosen with the retrieval evaluation (section 18); the first version used 3,000 / 400.
 **Why:** Fixed-size chunking is predictable and easy to reason about. The overlap keeps a fact that sits on a chunk boundary retrievable from at least one chunk. Keeping chunks within one page makes every citation point to exactly one page. Length is measured in characters because it needs no tokenizer and behaves the same for German and English text.
 **Rejected:** Semantic chunking (boundaries chosen by embedding similarity). It adds tuning parameters that cannot be validated properly in the time available, for an unproven gain on this kind of document.
 **Trade-off:** A passage that runs across a page break is split into two chunks.
@@ -109,13 +111,13 @@ In tests with the chosen model, 8 of 9 answers were correct in content and langu
 **Why:** It is the simplest retrieval that works, and it gives a clear baseline to measure improvements against.
 **Rejected for now:** Hybrid search (keyword plus vector) and reranking. Both are the most likely next improvements, especially for exact product codes and part numbers, but they should be added when the evaluation shows where the baseline fails, not before.
 **Trade-off:** Pure vector search can miss exact identifiers such as article numbers.
-**Observed:** in a first end-to-end test, the question about the protection class ranked a datasheet's title page (which repeats the product name) above the technical-data page that holds the answer. The answer was still correct because both were in the top 5, but it shows why the evaluation measures the rank of the right page, not just whether it was found.
+**Observed:** in a first end-to-end test, the question about the protection class ranked a datasheet's title page (which repeats the product name) above the technical-data page that holds the answer. The answer was still correct because both were in the top 5, but it shows why the evaluation measures the rank of the right page, not just whether it was found. The evaluation then confirmed the article-number weakness with numbers (section 18), which makes hybrid search the first improvement to add.
 
 ## 11. Why retrieval at all, when models accept very long inputs
 
 Current models accept around one million tokens, so the whole document could be sent with every question. This was considered.
 **Chosen:** retrieval, because
-- **Cost:** a 200-page manual is roughly 100,000 tokens per question, against about 4,000 with retrieval (about 20 times less).
+- **Cost:** a 200-page manual is roughly 100,000 tokens per question, against about 2,000 with retrieval (about 50 times less).
 - **Scale:** a company's full set of datasheets, manuals and specifications does not fit into any context window.
 - **Traceability:** with retrieval it is known exactly which passages the model saw, so the citations are reliable.
 
@@ -144,7 +146,7 @@ Added later: `DELETE /documents/{id}` removes a document's passages and its stor
 ## 14. Cost shown per answer
 
 **Decision:** Each answer reports the model used, its token usage and the cost, from a price table in `pricing.py` that records its source and the date it was checked. Thinking tokens are counted as output, because they are billed as output.
-**Why:** Whether a tool like this is worth running at scale is a cost question. Showing the figure on every answer makes it concrete instead of assumed. Measured in the first end-to-end test: about $0.0002–0.0003 per question with short documents; with full-size chunks about $0.002.
+**Why:** Whether a tool like this is worth running at scale is a cost question. Showing the figure on every answer makes it concrete instead of assumed. Measured in the first end-to-end test: about $0.0002–0.0003 per question with short documents; with full-size passages about $0.001.
 **Trade-off:** The price table must be kept current (the `gemini-3.8-flash` price doubles on 2027-01-01). Unknown models report no cost rather than a wrong one.
 
 ## 15. Packaging: Docker Compose
@@ -171,9 +173,26 @@ Added later: `DELETE /documents/{id}` removes a document's passages and its stor
 **Left out on purpose:** search in the document list, stored chat sessions and suggested questions. They help with large collections and many users; for a handful of documents they add little, and stored sessions need users and a database first.
 **Trade-off:** Documents uploaded before this change have no stored file and must be uploaded again to be opened or summarised.
 
-## 18. Evaluation (planned)
+## 18. Retrieval evaluation
 
-A set of test questions, each with the page that contains the answer. Metrics: hit rate at 1, 3 and 5 (is the right page among the top results) and mean reciprocal rank (how high it appears). Used to compare two or three chunk sizes. Results will be added here.
+**Setup:** 24 questions (11 German, 13 English) on four public product documents from a lighting manufacturer: a product brochure in German and its English edition, and two datasheets for the same luminaire, one English (Bluetooth version) and one German (DALI version). Each question lists every page that holds the answer; for the brochure that is the matching page in either language. The script (`evaluation/run_eval.py`) uses the application's own parsing, chunking, embedding and search, with an in-memory Qdrant. Only retrieval is measured, not the answer model. Metrics: hit@k, the share of questions with a correct page in the top k; MRR, the mean of 1/rank of the first correct page (1.0 means always first).
+
+| Chunk size / overlap | Passages | hit@1 | hit@3 | hit@5 | MRR |
+|---|---|---|---|---|---|
+| 800 / 100 | 71 | 0.92 | 0.96 | 0.96 | 0.93 |
+| **1500 / 200 (chosen)** | 54 | 0.88 | 0.96 | 0.96 | 0.91 |
+| 3000 / 400 (first version) | 44 | 0.83 | 0.92 | 0.96 | 0.88 |
+
+**Decision:** 1,500 / 200. Both smaller sizes rank the right page first more often than 3,000, because a long datasheet page as one passage mixes many facts and matches no single question well. Between 800 and 1,500 the difference is one question out of 24, too small to be meaningful; 1,500 keeps twice the context per passage for the answer model and has the same hit@3 and hit@5. It also halves the prompt compared with 3,000 (about 2,000 tokens per question).
+
+**What the results show:**
+- All 17 brochure questions have the right page first, in both languages; German questions 11 of 11 first.
+- Every miss is a datasheet question: questions by article number and English questions whose answer exists only in the German datasheet (ranks 2 and 3, and one question not in the top 5). Cross-language retrieval works well on brochure prose and less well on dense specification tables; exact identifiers are the known weakness of pure vector search.
+- The next improvement is therefore hybrid search: keyword matching for article numbers and technical terms alongside vector search, re-evaluated with this same question set.
+
+**Limits of this evaluation:** 24 questions on four documents is enough to compare settings and find failure patterns, not to state a precise accuracy. The questions were written after reading the documents, so they are answerable by design; real user questions will be vaguer.
+
+**Found while running it:** the free-tier embedding quota (see section 6).
 
 ---
 

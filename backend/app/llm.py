@@ -14,10 +14,12 @@ from google.genai import types
 
 from app.config import get_settings
 
+# Used for embeddings. Waits add up to about a minute (2+4+8+16+32 s), because
+# the free-tier limit of 100 embedded texts per minute resets per minute.
 _RETRY = types.HttpRetryOptions(
-    attempts=5,
+    attempts=6,
     initial_delay=2.0,
-    max_delay=30.0,
+    max_delay=60.0,
     http_status_codes=[429, 500, 503],
 )
 

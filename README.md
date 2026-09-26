@@ -36,7 +36,7 @@ Only `GEMINI_API_KEY` is required. Everything else has a default.
 | `CHAT_MODELS` | `gemini-3.1-flash-lite,gemini-3.5-flash-lite` | Answer models, tried in order when one is overloaded or too slow |
 | `CHAT_TIMEOUT_SECONDS` | `10` | Time each answer model gets before the next one is tried (API minimum: 10) |
 | `EMBEDDING_MODEL` / `EMBEDDING_DIM` | `gemini-embedding-2` / `768` | Embedding model and vector size |
-| `CHUNK_SIZE` / `CHUNK_OVERLAP` | `3000` / `400` | Passage length and overlap, in characters |
+| `CHUNK_SIZE` / `CHUNK_OVERLAP` | `1500` / `200` | Passage length and overlap, in characters (chosen with the retrieval evaluation) |
 | `TOP_K` | `5` | Passages given to the model per question |
 
 ---
@@ -64,7 +64,7 @@ Browser ──► nginx (frontend container, :8080)
                                                    └──► Qdrant (:6333, vectors + passages)
 ```
 
-**Upload** (`POST /documents`): PDF → text per page (PyMuPDF) → passages of up to 3,000 characters with 400 characters overlap, cut at paragraph or sentence boundaries → one 768-dimensional vector per passage (`gemini-embedding-2`) → stored in Qdrant with file, page and text. The document id is a hash of the file content, so uploading the same file again replaces it instead of creating duplicates.
+**Upload** (`POST /documents`): PDF → text per page (PyMuPDF) → passages of up to 1,500 characters with 200 characters overlap, cut at paragraph or sentence boundaries → one 768-dimensional vector per passage (`gemini-embedding-2`) → stored in Qdrant with file, page and text. The document id is a hash of the file content, so uploading the same file again replaces it instead of creating duplicates.
 
 The original PDF is kept on a Docker volume, so it can be opened at a cited page (`GET /documents/{id}/file#page=N`) or downloaded. Only ids of the form produced by the hash are accepted, so the endpoint cannot be used to read other files.
 
@@ -88,7 +88,8 @@ The full reasoning, rejected alternatives and trade-offs are in **[DECISIONS.md]
 | Qdrant | Metadata filtering, payload next to vectors, production-grade, one container | Chroma, FAISS, pgvector |
 | Passages within one page | Every citation points to exactly one page | Passages across page breaks |
 | Question language detected in code | A prompt rule alone produced German answers to English questions in 4 of 9 test runs; naming the language fixed it (9 of 9) | Prompt wording only; a language-detection library |
-| Retrieval instead of whole documents in the prompt | About 20× cheaper per question on long manuals, scales to many documents, reliable citations | Long-context prompting (simpler for a single short document) |
+| Retrieval instead of whole documents in the prompt | About 2,000 tokens per question instead of ~100,000 for a long manual, scales to many documents, reliable citations | Long-context prompting (simpler for a single short document) |
+| 1,500-character passages | Measured: right page ranked first for 88% of 24 test questions, vs 83% with 3,000 | 3,000 (worse ranking), 800 (one question better, half the context per passage) |
 | One module per external system | `llm.py` is the only code that talks to Gemini, `vector_store.py` the only code that talks to Qdrant, so either can be replaced in one place | – |
 
 ---
@@ -105,6 +106,23 @@ python -m venv .venv
 ```
 
 Behaviour the unit tests cannot prove was checked against the live API and recorded in DECISIONS.md: cross-language retrieval (a German question scores 0.77 against the matching English passage vs 0.69 against an unrelated one), answer language, answers to questions the documents do not cover, model latency during the day, and the full flow in Docker (including a 5 MB upload and data surviving a container restart).
+
+### Retrieval evaluation
+
+24 questions in German and English on four public product documents from a lighting manufacturer (a product brochure in German and English, two datasheets), each with the pages that hold the answer. Analysis in DECISIONS.md, section 18.
+
+| Chunk size / overlap | hit@1 | hit@3 | hit@5 | MRR |
+|---|---|---|---|---|
+| 800 / 100 | 0.92 | 0.96 | 0.96 | 0.93 |
+| **1500 / 200 (default)** | 0.88 | 0.96 | 0.96 | 0.91 |
+| 3000 / 400 | 0.83 | 0.92 | 0.96 | 0.88 |
+
+All brochure questions find the right page first. The misses are datasheet questions by article number or across languages, which is why hybrid search is the first next step. The documents are not included in the repository. To run:
+
+```bash
+cd backend
+.venv/Scripts/python ../evaluation/run_eval.py --docs <folder with the four PDFs>
+```
 
 ### Running without Docker (development)
 
@@ -127,8 +145,8 @@ cd frontend && npm install && npm run dev     # http://localhost:5173
 
 ## Next steps, with more time
 
-1. **Retrieval evaluation:** a set of questions with the page that holds each answer; measure hit rate and mean reciprocal rank, and use it to tune chunk size and top-k.
-2. **Hybrid search and reranking:** keyword search alongside vector search for article numbers and codes; rerank the top 20 passages.
+1. **Hybrid search and reranking:** keyword search alongside vector search for article numbers and codes, where the evaluation shows the misses; rerank the top 20 passages; re-run the same evaluation to measure the gain.
+2. **A larger evaluation set** built from real user questions, including answer quality, not only retrieval.
 3. **Scanned pages, tables and diagrams:** `gemini-embedding-2` can embed page images directly.
 4. **Conversation memory:** rewrite follow-up questions using the previous turns before retrieval.
 5. **Data protection for real documents:** Vertex AI in an EU region, or an open-weight model (for example `gpt-oss-120b`) on company or EU infrastructure, behind the same `generate()` interface.
@@ -166,5 +184,6 @@ frontend/
     components/        DocumentPanel, ChatPanel, Exchange, AnswerText, SourceList
   nginx.conf           serves the app, proxies /api to the backend
 docker-compose.yml     qdrant, backend, frontend
+evaluation/            retrieval evaluation: questions, script, results
 DECISIONS.md           decisions, alternatives, measurements
 ```

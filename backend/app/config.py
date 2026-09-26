@@ -21,8 +21,9 @@ class Settings(BaseSettings):
     # Per model. The Gemini API rejects deadlines below 10 seconds.
     chat_timeout_seconds: int = Field(default=10, ge=10)
 
-    chunk_size: int = 3000
-    chunk_overlap: int = 400
+    # Chosen with the retrieval evaluation (evaluation/results.md).
+    chunk_size: int = 1500
+    chunk_overlap: int = 200
     top_k: int = 5
 
     qdrant_url: str = "http://localhost:6333"
