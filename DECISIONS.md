@@ -50,7 +50,7 @@ The guiding rule: a small system that works end to end and where every step can 
 
 **Decision:** Google Gemini for both embeddings and answer generation. The rest of the code only calls two functions, `embed()` and `generate()`. Model names are configuration (`.env`), not code.
 **Why:** One provider for both steps means one API key, one SDK and one set of rate limits. The Gemini models are multilingual, which matters for a German company with German and English documents. Keeping model names in configuration matters because model generations change quickly.
-**Rejected:** OpenAI (comparable quality and price; no advantage for this task and requires prepaid credit). Anthropic (no embedding API, so a second provider would be needed). xAI Grok (no embedding model in its API, and its cheapest models cost $1.25 per million input tokens against $0.25 for the Gemini model used; its larger context window does not matter when each question sends about 4,000 tokens). A local model via Ollama (no API cost, but a multi-gigabyte install on the reviewer's machine and slower answers).
+**Rejected:** OpenAI (comparable quality and price; no advantage for this task and requires prepaid credit). Anthropic (no embedding API, so a second provider would be needed). xAI Grok (no embedding model in its API, and its cheapest models cost $1.25 per million input tokens against $0.25 for the Gemini model used; its larger context window does not matter when each question sends about 4,000 tokens). OpenAI's open-weight `gpt-oss-120b` on Groq (fast and cheap, but no embedding model, so a second provider and key, and its free tier allows 8,000 tokens per minute, about two questions per minute with full-size passages). A local model via Ollama (no API cost, but a multi-gigabyte install on the reviewer's machine and slower answers).
 **Trade-off:** Dependence on an external API and its rate limits. Switching provider means implementing `embed()` and `generate()` for the new SDK and re-embedding the documents.
 
 **Answer model, chosen by measurement:** the plan was the newest stable Flash model (`gemini-3.8-flash`). Tested on the free tier on 2026-09-25, it returned `503 model overloaded` on every call, and `gemini-3.5-flash` timed out after 60 seconds. The two Flash-Lite models were the only ones that answered reliably, but their speed changed during the day:
@@ -150,6 +150,8 @@ Current models accept around one million tokens, so the whole document could be 
 
 **Decision:** Three services (frontend, backend, qdrant) started with `docker compose up`. The API key and model names come from a `.env` file; `.env.example` lists every variable.
 **Why:** Running from the container on the reviewer's machine is a hard requirement, so Docker is set up at the start of the build and kept working, not added at the end.
+**Details:** The frontend image builds the app with Node and serves it with nginx, which also forwards `/api` to the backend; nginx's default 1 MB upload limit is raised to match the backend's 20 MB. The backend image uses the same Python version as local development. Base images and Qdrant are pinned to exact versions.
+**Verified:** a build from scratch takes about four minutes; a 5 MB upload goes through nginx; German and English questions are answered in 2–3 seconds; uploaded documents survive `docker compose down` and `up`.
 **Trade-off:** Requires Docker Desktop on the reviewer's machine.
 
 ## 16. Data protection and provider terms
@@ -176,4 +178,5 @@ A set of test questions, each with the page that contains the answer. Metrics: h
 | Streaming answers | Improves perceived speed only | Stream tokens from the model to the UI |
 | Authentication and per-user documents | Single-user local demo | Add login and store an owner id with each chunk for filtering |
 | EU data residency | Demo uses public documents | Move to Vertex AI in an EU region |
+| Full control over data | Needs own infrastructure | Run an open-weight model (for example `gpt-oss-120b`) on company or EU servers behind the same `generate()` interface |
 | Integration with company systems | Outside the case scope | Connect document sources and automation tools through the existing API |
