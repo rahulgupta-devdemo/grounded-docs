@@ -5,8 +5,8 @@ export type Language = "en" | "de";
 const en = {
   appTitle: "Document Chat",
   appSubtitle: "Answers come only from your documents.",
-  themeDark: "Dark",
-  themeLight: "Light",
+  themeDark: "Switch to dark mode",
+  themeLight: "Switch to light mode",
   upload: "Upload PDF",
   indexing: (name: string) => `Indexing ${name}…`,
   searchIn: "Search in",
@@ -51,8 +51,8 @@ export type Messages = typeof en;
 const de: Messages = {
   appTitle: "Dokumenten-Chat",
   appSubtitle: "Antworten kommen nur aus Ihren Dokumenten.",
-  themeDark: "Dunkel",
-  themeLight: "Hell",
+  themeDark: "Zum dunklen Design wechseln",
+  themeLight: "Zum hellen Design wechseln",
   upload: "PDF hochladen",
   indexing: (name) => `${name} wird indexiert…`,
   searchIn: "Suchen in",

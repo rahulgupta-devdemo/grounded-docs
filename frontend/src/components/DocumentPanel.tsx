@@ -20,6 +20,35 @@ type Props = {
   onSummarize: (document: DocumentInfo) => void;
 };
 
+const iconProps = {
+  width: 16,
+  height: 16,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 2,
+  strokeLinecap: "round",
+  strokeLinejoin: "round",
+  "aria-hidden": true,
+} as const;
+
+function SunIcon() {
+  return (
+    <svg {...iconProps}>
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+    </svg>
+  );
+}
+
+function MoonIcon() {
+  return (
+    <svg {...iconProps}>
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+    </svg>
+  );
+}
+
 const linkButton =
   "text-slate-600 hover:underline disabled:text-slate-400 disabled:no-underline dark:text-slate-300 dark:disabled:text-slate-600";
 
@@ -99,9 +128,11 @@ export default function DocumentPanel({
             <button
               type="button"
               onClick={() => onThemeChange(theme === "dark" ? "light" : "dark")}
-              className="rounded-md border border-slate-300 px-2 py-0.5 font-medium text-slate-600 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
+              aria-label={theme === "dark" ? t.themeLight : t.themeDark}
+              title={theme === "dark" ? t.themeLight : t.themeDark}
+              className="rounded-md border border-slate-300 p-1 text-slate-600 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
             >
-              {theme === "dark" ? t.themeLight : t.themeDark}
+              {theme === "dark" ? <SunIcon /> : <MoonIcon />}
             </button>
           </div>
         </div>
