@@ -124,6 +124,45 @@ def test_keep_valid_citations(answer, expected):
     assert keep_valid_citations(answer, valid={1, 2, 3, 4, 5}) == expected
 
 
+@pytest.mark.parametrize(
+    ("text", "language_word"),
+    [
+        ("ok", "Ask me"),
+        ("Hi!", "Ask me"),
+        ("Thank you.", "Ask me"),
+        ("How are you?", "Ask me"),
+        ("What's up?", "Ask me"),
+        ("Hallo!", "Stellen Sie"),
+        ("  Vielen   Dank ", "Stellen Sie"),
+        ("Wie geht's?", "Stellen Sie"),
+        ("What can you do?", "Ask me"),
+        ("Was kannst du?", "Stellen Sie"),
+    ],
+)
+def test_small_talk_gets_a_hint_without_search_or_model_call(
+    client, two_documents, fake_generate, monkeypatch, text, language_word
+):
+    searched = []
+    monkeypatch.setattr(llm, "embed_query", lambda question: searched.append(question))
+
+    body = _ask(client, text).json()
+
+    assert body["answer"].startswith(language_word)
+    assert body["sources"] == [] and body["usage"] is None
+    assert searched == [] and fake_generate.prompts == []
+
+
+@pytest.mark.parametrize(
+    "question",
+    ["IP66?", "AB12CD34EF", "ok, what is the IP rating?", "How are you mounting the luminaire?", "Hallo, was ist die Leuchte?"],
+)
+def test_short_real_questions_are_still_searched(client, two_documents, fake_generate, question):
+    body = _ask(client, question).json()
+
+    assert body["sources"] != []
+    assert len(fake_generate.prompts) == 1
+
+
 def test_empty_question_is_rejected(client):
     assert _ask(client, "").status_code == 422
 

@@ -49,7 +49,7 @@ Only `GEMINI_API_KEY` is required. Everything else has a default.
 - **Check** every answer: citations such as [1] open the source passage, and from there the original PDF at that page; passages retrieved but not used are listed separately.
 - **Summarise** a whole document with one click. Questions use a few retrieved passages; a summary sends the complete document text in one call and cites pages.
 - **Open, download or delete** documents. Deleting removes both the passages and the stored PDF. The list shows when each document was uploaded and can be sorted by name or newest first; the panel can be widened for long file names.
-- **Say "not found"** when the documents do not contain the answer, instead of guessing.
+- **Say "not found"** when the documents do not contain the answer, instead of guessing. Greetings, acknowledgements such as "ok" or "thanks", and questions about the app itself such as "what can you do" get a short hint instead of a search.
 - **Work across languages:** a German question can be answered from an English datasheet and the other way round; the answer is always in the language of the question.
 - **Show the cost:** each answer shows the model used, tokens and cost (typically well below $0.01).
 - **Stay available:** if an answer model is overloaded or takes longer than 10 seconds, the next configured model answers.
@@ -121,7 +121,7 @@ The full reasoning, rejected alternatives and trade-offs are in **[DECISIONS.md]
 
 ## Testing
 
-84 automated tests cover chunking, PDF extraction, the Gemini integration (batching, fallback, error handling), upload, chat, file, summary and delete endpoints (including attempts to read other files through the file endpoint), citations and their validation, cost, language detection and the optional hybrid search. They run in a few seconds without Docker or an API key: Qdrant runs in memory and the Gemini calls are replaced by fakes.
+99 automated tests cover chunking, PDF extraction, the Gemini integration (batching, fallback, error handling), upload, chat, file, summary and delete endpoints (including attempts to read other files through the file endpoint), citations and their validation, cost, language detection and the optional hybrid search. They run in a few seconds without Docker or an API key: Qdrant runs in memory and the Gemini calls are replaced by fakes.
 
 ```bash
 cd backend
@@ -162,20 +162,24 @@ All brochure questions rank the right page first, in both languages. Every miss 
 | **Semantic (default)** | **0.88** | **0.96** | **0.96** | **0.91** | **22 of 24** |
 | Hybrid | 0.75 | 0.92 | 0.92 | 0.83 | 21 of 24 |
 
-Semantic search is already strong on these documents, and an equally weighted keyword ranking mostly adds noise: words such as the product name occur on many pages. Keyword matching also cannot bridge languages: for an English question about the German datasheet, the English word "order" matched the English datasheet's "Order No." header and pulled the wrong document up. The default therefore stays semantic; `RETRIEVAL_MODE=hybrid` switches the experiment on, and both evaluation scripts compare the two modes.
+Answer counts vary by about one between runs of the same setup (see below), so the retrieval columns carry this comparison. Semantic search is already strong on these documents, and an equally weighted keyword ranking mostly adds noise: words such as the product name occur on many pages. Keyword matching also cannot bridge languages: for an English question about the German datasheet, the English word "order" matched the English datasheet's "Order No." header and pulled the wrong document up. The default therefore stays semantic; `RETRIEVAL_MODE=hybrid` switches the experiment on, and both evaluation scripts compare the two modes.
 
 ### Answer-quality evaluation
 
 The same 24 questions went through the full pipeline (retrieval, prompt, answer model, citations), together with 8 questions the documents cannot answer (price, warranty, delivery time, reference customers, ATEX approval, production CO₂, packaging colour, the manufacturer's CEO). Each answer was checked automatically for the expected facts, and each "not answerable" question for a clear statement that the documents do not contain the information; the two automatic misses were then checked by hand.
 
-| Check | Result |
-|---|---|
-| Answer contains the expected facts | **22 of 24** |
-| Answer cites a page that holds the answer | 23 of 24 |
-| Unanswerable question correctly declined | **8 of 8** |
-| Invented values across all 32 answers | none found |
+The full evaluation was run twice with the same documents, questions and settings, because the answer model does not give identical answers every time:
 
-Both misses are the datasheet cases the retrieval evaluation already pointed to. An English question about a value that only exists in the German datasheet found the right page but not the passage with the value, and the answer said the documents do not contain it: wrong, but a safe failure rather than a guess. A question about "certifications" was answered with the product family's certificate list from the brochure, which is correct there, but missed the approval marks listed in the datasheet.
+| Check | Run 1 | Run 2 |
+|---|---|---|
+| Answer contains the expected facts | **22 of 24** | **21 of 24** |
+| Answer cites a page that holds the answer | 23 of 24 | 23 of 24 |
+| Unanswerable question correctly declined | **8 of 8** | **8 of 8** |
+| Answers stating a wrong value | none | 1 |
+
+Two misses appear in both runs, and both are datasheet cases the retrieval evaluation already pointed to. An English question about a value that only exists in the German datasheet found the right page but not the passage with the value, and the answer said the documents do not contain it: wrong, but a safe failure rather than a guess. A question about "certifications" was answered with the product family's certificate list from the brochure, which is correct there, but missed the approval marks listed in the datasheet.
+
+Run 2 also had one real error. The brochure page prints "50 % lighter than the previous model" directly above "25 % faster installation", and asked how much faster installation is, the answer said 50 %. The number is on the cited page, so one click on the citation shows the mistake, but the answer is wrong. Mixing up neighbouring figures on a page of short claims is a known weakness of language models, and it is the reason every answer shows its sources.
 
 **Run them on your own documents:** copy `evaluation/questions.example.json` to `evaluation/questions.json`, list your PDFs, questions, expected pages and expected facts, then:
 

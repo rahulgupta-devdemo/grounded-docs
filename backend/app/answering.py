@@ -5,6 +5,7 @@ from app.config import get_settings
 from app.language import detect_language
 from app.pricing import generation_cost
 from app.schemas import ChatResponse, Source, Usage
+from app.small_talk import small_talk_reply
 from app.vector_store import SearchHit
 
 SYSTEM_INSTRUCTION = """\
@@ -28,6 +29,12 @@ _CITATION_WITH_SPACE = re.compile(r"(\s*)\[(\d+(?:\s*,\s*\d+)*)\]")
 
 
 def answer_question(question: str, document_ids: list[str] | None = None) -> ChatResponse:
+    # Greetings and acknowledgements get a hint instead of a search: no cost,
+    # and no "not in the documents" answer to "ok".
+    reply = small_talk_reply(question)
+    if reply is not None:
+        return ChatResponse(answer=reply, sources=[], usage=None)
+
     if document_ids == []:
         return ChatResponse(answer=NO_DOCUMENTS_ANSWER, sources=[], usage=None)
 
