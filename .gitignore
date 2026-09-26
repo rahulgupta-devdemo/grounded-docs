@@ -8,8 +8,7 @@
 *.html
 !frontend/index.html
 evaluation/questions.json
-evaluation/results.md
-evaluation/results_answers.md
+evaluation/results*.md
 
 # Python
 __pycache__/

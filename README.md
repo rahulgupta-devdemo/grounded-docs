@@ -87,7 +87,7 @@ The frontend only ever calls `/api`. In development Vite forwards it to the back
 | PDF extraction | PyMuPDF (text per page, in reading order) |
 | Embeddings | Google `gemini-embedding-2`, 768 dimensions, multilingual |
 | Answer model | Google `gemini-3.1-flash-lite`, fallback `gemini-3.5-flash-lite` |
-| Vector database | Qdrant 1.19 (cosine similarity, payload filtering) |
+| Vector database | Qdrant 1.19 (cosine similarity, payload filtering; keyword vectors with IDF for the optional hybrid search) |
 | RAG orchestration | Own code: chunking, retrieval, prompt, citations, summaries |
 | Packaging | Docker Compose: frontend, backend, Qdrant; data on Docker volumes |
 | Tests | pytest with an in-memory Qdrant and fake model calls |
@@ -107,6 +107,7 @@ The full reasoning, rejected alternatives and trade-offs are in **[DECISIONS.md]
 | Passages within one page | Every citation points to exactly one page | Passages across page breaks |
 | Question language detected in code | A prompt rule alone produced German answers to English questions in 4 of 9 test runs; naming the language fixed it (9 of 9) | Prompt wording only; a language-detection library |
 | Retrieval instead of whole documents in the prompt | About 2,000 tokens per question instead of ~100,000 for a long manual, scales to many documents, reliable citations | Long-context prompting (simpler for a single short document) |
+| Semantic search, no keyword search by default | Measured: hybrid search (keyword + semantic, rank fusion) ranked the right page first for 75% instead of 88% and answered 21 instead of 22 questions correctly | Hybrid search (kept as an option) |
 | 1,500-character passages | Measured: right page ranked first for 88% of 24 test questions, vs 83% with 3,000 | 3,000 (worse ranking), 800 (one question better, half the context per passage) |
 | One module per external system | `llm.py` is the only code that talks to Gemini, `vector_store.py` the only code that talks to Qdrant, so either can be replaced in one place | – |
 
@@ -120,7 +121,7 @@ The full reasoning, rejected alternatives and trade-offs are in **[DECISIONS.md]
 
 ## Testing
 
-72 automated tests cover chunking, PDF extraction, the Gemini integration (batching, fallback, error handling), upload, chat, file, summary and delete endpoints (including attempts to read other files through the file endpoint), citations, cost and language detection. They run in a few seconds without Docker or an API key: Qdrant runs in memory and the Gemini calls are replaced by fakes.
+77 automated tests cover chunking, PDF extraction, the Gemini integration (batching, fallback, error handling), upload, chat, file, summary and delete endpoints (including attempts to read other files through the file endpoint), citations, cost, language detection and the optional hybrid search. They run in a few seconds without Docker or an API key: Qdrant runs in memory and the Gemini calls are replaced by fakes.
 
 ```bash
 cd backend
@@ -153,6 +154,15 @@ A public 212-page product catalogue (41 MB) indexed in 119 seconds into 269 pass
 | 3000 / 400 | 44 | 0.83 | 0.92 | 0.96 | 0.88 |
 
 All brochure questions rank the right page first, in both languages. Every miss is a datasheet question: by article number, or in English about the German-only datasheet. Smaller passages rank better because a long specification page as one passage mixes too many facts. 1,500 was chosen over 800 because the difference is one question of 24, while 1,500 keeps twice the context per passage. Details in DECISIONS.md, section 18.
+
+**Hybrid search, built and measured.** Because the misses involve article numbers, a keyword search was added next to the semantic search: each passage also gets a sparse word vector, Qdrant weights words by rarity (IDF, as in BM25), and the two rankings are merged with reciprocal rank fusion. On the same questions it was worse for every chunk size:
+
+| 1500 / 200 | hit@1 | hit@3 | hit@5 | MRR | Answers correct |
+|---|---|---|---|---|---|
+| **Semantic (default)** | **0.88** | **0.96** | **0.96** | **0.91** | **22 of 24** |
+| Hybrid | 0.75 | 0.92 | 0.92 | 0.83 | 21 of 24 |
+
+Semantic search is already strong on these documents, and an equally weighted keyword ranking mostly adds noise: words such as the product name occur on many pages. Keyword matching also cannot bridge languages: for an English question about the German datasheet, the English word "order" matched the English datasheet's "Order No." header and pulled the wrong document up. The default therefore stays semantic; `RETRIEVAL_MODE=hybrid` switches the experiment on, and both evaluation scripts compare the two modes.
 
 ### Answer-quality evaluation
 
@@ -197,7 +207,7 @@ cd frontend && npm install && npm run dev     # http://localhost:5173
 
 ## Next steps, with more time
 
-1. **Hybrid search and reranking:** keyword search alongside vector search for article numbers and codes, where the evaluation shows the misses; rerank the top 20 passages; re-run the same evaluation to measure the gain.
+1. **Better retrieval for identifiers and cross-language datasheets:** plain hybrid search measured worse (see above). Next candidates, each measured with the same questions plus the catalogue check as a holdout: a reranker over the top 20 passages; keyword matching only for identifier-like terms such as article numbers; fusion weighted towards semantic search.
 2. **A larger evaluation set** built from real user questions, including answer quality, not only retrieval.
 3. **Scanned pages, tables and diagrams:** `gemini-embedding-2` can embed page images directly.
 4. **Conversation memory:** rewrite follow-up questions using the previous turns before retrieval.

@@ -1,5 +1,6 @@
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -25,6 +26,9 @@ class Settings(BaseSettings):
     chunk_size: int = 1500
     chunk_overlap: int = 200
     top_k: int = 5
+    # "dense" = semantic search; "hybrid" = semantic + keyword search with rank
+    # fusion. Hybrid measured worse on the evaluation set (DECISIONS.md, section 18).
+    retrieval_mode: Literal["dense", "hybrid"] = "dense"
 
     qdrant_url: str = "http://localhost:6333"
     documents_dir: str = "data/documents"

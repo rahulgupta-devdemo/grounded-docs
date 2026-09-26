@@ -8,10 +8,14 @@ from qdrant_client import QdrantClient, models
 
 from app.chunking import Chunk
 from app.config import get_settings
+from app.keywords import keyword_vector, query_vector
 from app.schemas import DocumentInfo
 
-
 _PAGE_SIZE = 1000
+_DENSE = "dense"
+_SPARSE = "sparse"
+# Candidates each search contributes before the two rankings are fused.
+_CANDIDATES = 20
 
 
 @dataclass(frozen=True)
@@ -20,7 +24,9 @@ class SearchHit:
     filename: str
     page: int
     text: str
-    score: float  # cosine similarity, higher is more similar
+    # Cosine similarity for semantic search, reciprocal-rank-fusion score for
+    # hybrid search; higher is better in both.
+    score: float
 
 
 @lru_cache
@@ -38,9 +44,10 @@ def is_reachable() -> bool:
 
 def collection_name() -> str:
     # Vectors from different models or sizes are not comparable, so each
-    # combination gets its own collection.
+    # combination gets its own collection. "hybrid" marks the layout with a
+    # semantic and a keyword vector per passage.
     settings = get_settings()
-    return f"chunks_{settings.embedding_model}_{settings.embedding_dim}"
+    return f"chunks_{settings.embedding_model}_{settings.embedding_dim}_hybrid"
 
 
 def replace_document(
@@ -58,7 +65,10 @@ def replace_document(
         points=[
             models.PointStruct(
                 id=str(uuid.uuid5(uuid.NAMESPACE_URL, f"{document.id}/{chunk.index}")),
-                vector=vector,
+                vector={
+                    _DENSE: vector,
+                    _SPARSE: keyword_vector(f"{document.filename} {chunk.text}"),
+                },
                 payload={
                     "document_id": document.id,
                     "filename": document.filename,
@@ -128,7 +138,13 @@ def _first_chunks(document_id: str | None = None) -> list[DocumentInfo]:
             return documents
 
 
-def search(vector: list[float], limit: int, document_ids: list[str] | None = None) -> list[SearchHit]:
+def search(
+    vector: list[float],
+    limit: int,
+    document_ids: list[str] | None = None,
+    keywords: str | None = None,
+) -> list[SearchHit]:
+    """Semantic search, or hybrid search when the question text is given as `keywords`."""
     client = get_client()
     name = collection_name()
     if not client.collection_exists(name):
@@ -140,9 +156,25 @@ def search(vector: list[float], limit: int, document_ids: list[str] | None = Non
             must=[models.FieldCondition(key="document_id", match=models.MatchAny(any=document_ids))]
         )
 
-    points = client.query_points(
-        name, query=vector, limit=limit, query_filter=query_filter, with_payload=True
-    ).points
+    sparse = query_vector(keywords) if keywords else None
+    if sparse is not None and sparse.indices:
+        # Both searches return their best candidates; reciprocal rank fusion
+        # merges the two rankings by position, so their different score
+        # scales never have to be compared.
+        points = client.query_points(
+            name,
+            prefetch=[
+                models.Prefetch(query=vector, using=_DENSE, filter=query_filter, limit=_CANDIDATES),
+                models.Prefetch(query=sparse, using=_SPARSE, filter=query_filter, limit=_CANDIDATES),
+            ],
+            query=models.FusionQuery(fusion=models.Fusion.RRF),
+            limit=limit,
+            with_payload=True,
+        ).points
+    else:
+        points = client.query_points(
+            name, query=vector, using=_DENSE, limit=limit, query_filter=query_filter, with_payload=True
+        ).points
     return [
         SearchHit(
             document_id=p.payload["document_id"],
@@ -160,9 +192,11 @@ def _ensure_collection(client: QdrantClient, name: str) -> None:
         return
     client.create_collection(
         name,
-        vectors_config=models.VectorParams(
-            size=get_settings().embedding_dim, distance=models.Distance.COSINE
-        ),
+        vectors_config={
+            _DENSE: models.VectorParams(size=get_settings().embedding_dim, distance=models.Distance.COSINE)
+        },
+        # IDF: Qdrant weights each word by how rare it is across all passages.
+        sparse_vectors_config={_SPARSE: models.SparseVectorParams(modifier=models.Modifier.IDF)},
     )
     client.create_payload_index(name, "document_id", models.PayloadSchemaType.KEYWORD)
     client.create_payload_index(name, "chunk_index", models.PayloadSchemaType.INTEGER)

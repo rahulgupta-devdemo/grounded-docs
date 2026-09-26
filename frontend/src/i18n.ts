@@ -43,7 +43,7 @@ const en = {
   sources: "Sources",
   alsoRetrieved: (n: number) => `Also retrieved, not used in the answer (${n})`,
   openPage: (page: number) => `Open page ${page} in the PDF ↗`,
-  similarity: "Cosine similarity to the question",
+  similarity: "Relevance score (higher is better)",
   showSource: (n: number) => `Show source ${n}`,
 };
 
@@ -90,7 +90,7 @@ const de: Messages = {
   sources: "Quellen",
   alsoRetrieved: (n) => `Ebenfalls gefunden, nicht in der Antwort verwendet (${n})`,
   openPage: (page) => `Seite ${page} im PDF öffnen ↗`,
-  similarity: "Kosinus-Ähnlichkeit zur Frage",
+  similarity: "Relevanzwert (höher ist besser)",
   showSource: (n) => `Quelle ${n} anzeigen`,
 };
 

@@ -29,8 +29,12 @@ def answer_question(question: str, document_ids: list[str] | None = None) -> Cha
     if document_ids == []:
         return ChatResponse(answer=NO_DOCUMENTS_ANSWER, sources=[], usage=None)
 
+    settings = get_settings()
     hits = vector_store.search(
-        llm.embed_query(question), limit=get_settings().top_k, document_ids=document_ids
+        llm.embed_query(question),
+        limit=settings.top_k,
+        document_ids=document_ids,
+        keywords=question if settings.retrieval_mode == "hybrid" else None,
     )
     if not hits:
         return ChatResponse(answer=NO_DOCUMENTS_ANSWER, sources=[], usage=None)
